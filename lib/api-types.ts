@@ -370,7 +370,11 @@ export interface paths {
         get: operations["ClientsController_me"];
         put?: never;
         post?: never;
-        delete?: never;
+        /**
+         * Delete (anonymise) the account
+         * @description Erasure per §7: the user is anonymised and signed out, ledger postings are preserved. Blocked while campaigns are still active with money in flight.
+         */
+        delete: operations["ClientsController_deleteAccount"];
         options?: never;
         head?: never;
         /**
@@ -378,66 +382,6 @@ export interface paths {
          * @description Partial — only the fields sent are changed.
          */
         patch: operations["ClientsController_update"];
-        trace?: never;
-    };
-    "/v1/dashboard/summary": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Client dashboard summary
-         * @description Top-line spend, views and promoter counts, plus a per-campaign rollup for the table.
-         */
-        get: operations["AnalyticsController_summary"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/campaigns/{id}/analytics": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Campaign analytics and evidence gallery
-         * @description Views delivered, offer acceptance, completion, amount spent, and every verified/pending submission with its screenshot — the four SOW metrics plus the evidence gallery (handoff §6).
-         */
-        get: operations["AnalyticsController_campaign"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/campaigns/{id}/payments/paystack/verify": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Confirm a Paystack payment and fund the campaign
-         * @description The reference is verified server-side with Paystack before any money moves. On success the campaign escrow is credited and the campaign goes LIVE. Idempotent on the Paystack reference.
-         */
-        post: operations["PaymentsController_verify"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
         trace?: never;
     };
     "/v1/admin/queues/promoters": {
@@ -676,6 +620,66 @@ export interface paths {
          * @description DR PROMOTER_AVAILABLE / CR BANK_CLEARING. Requires an Idempotency-Key.
          */
         post: operations["AdminController_recordWithdrawalPaid"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/dashboard/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Client dashboard summary
+         * @description Top-line spend, views and promoter counts, plus a per-campaign rollup for the table.
+         */
+        get: operations["AnalyticsController_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/campaigns/{id}/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Campaign analytics and evidence gallery
+         * @description Views delivered, offer acceptance, completion, amount spent, and every verified/pending submission with its screenshot — the four SOW metrics plus the evidence gallery (handoff §6).
+         */
+        get: operations["AnalyticsController_campaign"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/campaigns/{id}/payments/paystack/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm a Paystack payment and fund the campaign
+         * @description The reference is verified server-side with Paystack before any money moves. On success the campaign escrow is credited and the campaign goes LIVE. Idempotent on the Paystack reference.
+         */
+        post: operations["PaymentsController_verify"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1271,6 +1275,39 @@ export interface components {
             /** @example A couple of sentences about what you do. */
             description?: string;
         };
+        AdminDecisionDto: {
+            /** Format: uuid */
+            id: string;
+            status: string;
+            /**
+             * @description What changed.
+             * @example Recorded.
+             */
+            message: string;
+        };
+        RejectDto: {
+            /** @example Screenshot does not show the campaign creative. */
+            reason: string;
+        };
+        FundCampaignDto: {
+            /**
+             * @description Amount received, in kobo. Must equal the campaign price.
+             * @example 34500
+             */
+            amount_minor: number;
+            /**
+             * @description Bank reference for the transfer received.
+             * @example GTB transfer ref 8837261
+             */
+            reference?: string;
+        };
+        RecordWithdrawalPaidDto: {
+            /**
+             * @description Reference of the transfer the admin sent.
+             * @example Zenith transfer ref 552117
+             */
+            paid_ref: string;
+        };
         DashboardCampaignRowDto: {
             /** Format: uuid */
             id: string;
@@ -1387,39 +1424,6 @@ export interface components {
             status: string;
             /** @example Payment confirmed; your campaign is live. */
             message: string;
-        };
-        AdminDecisionDto: {
-            /** Format: uuid */
-            id: string;
-            status: string;
-            /**
-             * @description What changed.
-             * @example Recorded.
-             */
-            message: string;
-        };
-        RejectDto: {
-            /** @example Screenshot does not show the campaign creative. */
-            reason: string;
-        };
-        FundCampaignDto: {
-            /**
-             * @description Amount received, in kobo. Must equal the campaign price.
-             * @example 34500
-             */
-            amount_minor: number;
-            /**
-             * @description Bank reference for the transfer received.
-             * @example GTB transfer ref 8837261
-             */
-            reference?: string;
-        };
-        RecordWithdrawalPaidDto: {
-            /**
-             * @description Reference of the transfer the admin sent.
-             * @example Zenith transfer ref 552117
-             */
-            paid_ref: string;
         };
         CandidateChannelDto: {
             /** Format: uuid */
@@ -2190,6 +2194,26 @@ export interface operations {
             };
         };
     };
+    ClientsController_deleteAccount: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     ClientsController_update: {
         parameters: {
             query?: never;
@@ -2212,80 +2236,6 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ClientProfileDto"];
-                };
-            };
-        };
-    };
-    AnalyticsController_summary: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["DashboardSummaryDto"];
-                };
-            };
-        };
-    };
-    AnalyticsController_campaign: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
-                "Idempotency-Key"?: string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CampaignAnalyticsDto"];
-                };
-            };
-        };
-    };
-    PaymentsController_verify: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
-                "Idempotency-Key"?: string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "application/json": components["schemas"]["VerifyPaystackDto"];
-            };
-        };
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["PaymentResultDto"];
                 };
             };
         };
@@ -2605,6 +2555,80 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminDecisionDto"];
+                };
+            };
+        };
+    };
+    AnalyticsController_summary: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardSummaryDto"];
+                };
+            };
+        };
+    };
+    AnalyticsController_campaign: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignAnalyticsDto"];
+                };
+            };
+        };
+    };
+    PaymentsController_verify: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyPaystackDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentResultDto"];
                 };
             };
         };

@@ -17,6 +17,7 @@ export function SecurityTab() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [done, setDone] = useState(false);
+  const [showDelete, setShowDelete] = useState(false);
 
   async function changePassword() {
     setError(null); setDone(false);
@@ -83,11 +84,68 @@ export function SecurityTab() {
           <li>• Promoters with active offers on your campaigns will be notified.</li>
         </ul>
         <div className="mt-6">
-          <Button variant="secondary" size="lg" disabled title="Account deletion is a fast-follow" className="border-brand/30 text-brand-700">
+          <Button variant="secondary" size="lg" onClick={() => setShowDelete(true)} className="border-brand/30 text-brand-700">
             Delete my account
           </Button>
         </div>
       </section>
+
+      {showDelete && <DeleteAccountModal onClose={() => setShowDelete(false)} />}
+    </div>
+  );
+}
+
+function DeleteAccountModal({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
+  const { logout } = useAuth();
+  const [typed, setTyped] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const confirmed = typed.trim().toUpperCase() === 'DELETE';
+
+  async function remove() {
+    if (!confirmed) return;
+    setBusy(true); setError(null);
+    try {
+      await api.del('/v1/clients/me');
+      await logout();
+      router.replace('/login?deleted=1');
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not delete your account.');
+      setBusy(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-4 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+      <div className="w-full max-w-md rounded-2xl bg-paper p-6 sm:p-7" onClick={(e) => e.stopPropagation()}>
+        <h3 className="text-[19px] font-extrabold text-ink">Delete your account?</h3>
+        <p className="mt-2 text-[13.5px] text-muted">
+          This anonymises your account and cannot be undone. Your money history is preserved for records, but you
+          will lose access immediately.
+        </p>
+        <label className="mt-5 block">
+          <span className="text-[13px] font-semibold text-ink">Type <span className="text-brand-700">DELETE</span> to confirm</span>
+          <Field>
+            <input
+              autoFocus
+              value={typed}
+              onChange={(e) => setTyped(e.target.value)}
+              className="input mt-1.5"
+              placeholder="DELETE"
+            />
+          </Field>
+        </label>
+
+        {error && <p className="mt-3 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] text-brand-700">{error}</p>}
+
+        <div className="mt-6 flex justify-end gap-3">
+          <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button onClick={remove} loading={busy} disabled={!confirmed} className="bg-brand-700 hover:bg-brand-800">
+            Delete my account
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
