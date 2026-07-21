@@ -379,58 +379,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/campaigns/{id}/candidates": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Ranked eligible promoters for a campaign */
-        get: operations["MatchingController_candidates"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/campaigns/{id}/offers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Send offers to selected promoters */
-        post: operations["MatchingController_sendOffers"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/offers": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** My live offers */
-        get: operations["OffersController_list"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/offers/{id}/accept": {
+    "/v1/campaigns/{id}/payments/paystack/verify": {
         parameters: {
             query?: never;
             header?: never;
@@ -440,84 +389,10 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Accept an offer
-         * @description Reserves a slot atomically and issues the assignment. 409 if the offer is stale or the campaign is full.
+         * Confirm a Paystack payment and fund the campaign
+         * @description The reference is verified server-side with Paystack before any money moves. On success the campaign escrow is credited and the campaign goes LIVE. Idempotent on the Paystack reference.
          */
-        post: operations["OffersController_accept"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/offers/{id}/decline": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /** Decline an offer */
-        post: operations["OffersController_decline"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/r/{token}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Follow a promoter’s tracking link
-         * @description Records the click and redirects to the campaign destination. Public and unversioned. IP and user-agent are stored only as salted hashes.
-         */
-        get: operations["TrackingController_redirect"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/assignments/{id}/submission": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        put?: never;
-        /**
-         * Submit proof for an assignment
-         * @description A screenshot is required; public_url is optional because a WhatsApp status has none. The screenshot is perceptually hashed and compared with existing proof; a match sets auto_flag for the admin. Nothing auto-approves — every submission lands PENDING in the review queue.
-         */
-        post: operations["EvidenceController_submit"];
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/assignments/{id}/submissions": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** My submissions for this assignment */
-        get: operations["EvidenceController_list"];
-        put?: never;
-        post?: never;
+        post: operations["PaymentsController_verify"];
         delete?: never;
         options?: never;
         head?: never;
@@ -760,6 +635,151 @@ export interface paths {
          * @description DR PROMOTER_AVAILABLE / CR BANK_CLEARING. Requires an Idempotency-Key.
          */
         post: operations["AdminController_recordWithdrawalPaid"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/campaigns/{id}/candidates": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Ranked eligible promoters for a campaign */
+        get: operations["MatchingController_candidates"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/campaigns/{id}/offers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Send offers to selected promoters */
+        post: operations["MatchingController_sendOffers"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/offers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My live offers */
+        get: operations["OffersController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/offers/{id}/accept": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Accept an offer
+         * @description Reserves a slot atomically and issues the assignment. 409 if the offer is stale or the campaign is full.
+         */
+        post: operations["OffersController_accept"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/offers/{id}/decline": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Decline an offer */
+        post: operations["OffersController_decline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/r/{token}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Follow a promoter’s tracking link
+         * @description Records the click and redirects to the campaign destination. Public and unversioned. IP and user-agent are stored only as salted hashes.
+         */
+        get: operations["TrackingController_redirect"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assignments/{id}/submission": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Submit proof for an assignment
+         * @description A screenshot is required; public_url is optional because a WhatsApp status has none. The screenshot is perceptually hashed and compared with existing proof; a match sets auto_flag for the admin. Nothing auto-approves — every submission lands PENDING in the review queue.
+         */
+        post: operations["EvidenceController_submit"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assignments/{id}/submissions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** My submissions for this assignment */
+        get: operations["EvidenceController_list"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -1273,6 +1293,52 @@ export interface components {
             slots_total: number;
             evidence: components["schemas"]["EvidenceItemDto"][];
         };
+        VerifyPaystackDto: {
+            /**
+             * @description The reference Paystack returned on the client.
+             * @example RLA-1a2b3c4d-9f2k84b
+             */
+            reference: string;
+        };
+        PaymentResultDto: {
+            /** @example LIVE */
+            status: string;
+            /** @example Payment confirmed; your campaign is live. */
+            message: string;
+        };
+        AdminDecisionDto: {
+            /** Format: uuid */
+            id: string;
+            status: string;
+            /**
+             * @description What changed.
+             * @example Recorded.
+             */
+            message: string;
+        };
+        RejectDto: {
+            /** @example Screenshot does not show the campaign creative. */
+            reason: string;
+        };
+        FundCampaignDto: {
+            /**
+             * @description Amount received, in kobo. Must equal the campaign price.
+             * @example 34500
+             */
+            amount_minor: number;
+            /**
+             * @description Bank reference for the transfer received.
+             * @example GTB transfer ref 8837261
+             */
+            reference?: string;
+        };
+        RecordWithdrawalPaidDto: {
+            /**
+             * @description Reference of the transfer the admin sent.
+             * @example Zenith transfer ref 552117
+             */
+            paid_ref: string;
+        };
         CandidateChannelDto: {
             /** Format: uuid */
             id: string;
@@ -1340,39 +1406,6 @@ export interface components {
             note: Record<string, never> | null;
             /** Format: date-time */
             submitted_at: string;
-        };
-        AdminDecisionDto: {
-            /** Format: uuid */
-            id: string;
-            status: string;
-            /**
-             * @description What changed.
-             * @example Recorded.
-             */
-            message: string;
-        };
-        RejectDto: {
-            /** @example Screenshot does not show the campaign creative. */
-            reason: string;
-        };
-        FundCampaignDto: {
-            /**
-             * @description Amount received, in kobo. Must equal the campaign price.
-             * @example 34500
-             */
-            amount_minor: number;
-            /**
-             * @description Bank reference for the transfer received.
-             * @example GTB transfer ref 8837261
-             */
-            reference?: string;
-        };
-        RecordWithdrawalPaidDto: {
-            /**
-             * @description Reference of the transfer the admin sent.
-             * @example Zenith transfer ref 552117
-             */
-            paid_ref: string;
         };
         WalletDto: {
             /** @description Derived from ledger postings — there is no balance column. */
@@ -2075,31 +2108,7 @@ export interface operations {
             };
         };
     };
-    MatchingController_candidates: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
-                "Idempotency-Key"?: string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["CandidateDto"][];
-                };
-            };
-        };
-    };
-    MatchingController_sendOffers: {
+    PaymentsController_verify: {
         parameters: {
             query?: never;
             header?: {
@@ -2113,172 +2122,16 @@ export interface operations {
         };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["SendOffersDto"];
+                "application/json": components["schemas"]["VerifyPaystackDto"];
             };
         };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["OfferDto"][];
-                };
-            };
-        };
-    };
-    OffersController_list: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
-                "Idempotency-Key"?: string;
-            };
-            path?: never;
-            cookie?: never;
-        };
-        requestBody?: never;
         responses: {
             200: {
                 headers: {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["OfferDto"][];
-                };
-            };
-        };
-    };
-    OffersController_accept: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
-                "Idempotency-Key"?: string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["AssignmentDto"];
-                };
-            };
-        };
-    };
-    OffersController_decline: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
-                "Idempotency-Key"?: string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    TrackingController_redirect: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
-                "Idempotency-Key"?: string;
-            };
-            path: {
-                /** @description The assignment’s tracking token. */
-                token: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Redirect to the campaign destination. */
-            302: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            /** @description Unknown token. */
-            404: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-        };
-    };
-    EvidenceController_submit: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
-                "Idempotency-Key"?: string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody: {
-            content: {
-                "multipart/form-data": {
-                    /** Format: binary */
-                    file: string;
-                    public_url?: string;
-                    note?: string;
-                };
-            };
-        };
-        responses: {
-            201: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SubmissionDto"];
-                };
-            };
-        };
-    };
-    EvidenceController_list: {
-        parameters: {
-            query?: never;
-            header?: {
-                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
-                "Idempotency-Key"?: string;
-            };
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": components["schemas"]["SubmissionDto"][];
+                    "application/json": components["schemas"]["PaymentResultDto"];
                 };
             };
         };
@@ -2598,6 +2451,214 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminDecisionDto"];
+                };
+            };
+        };
+    };
+    MatchingController_candidates: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CandidateDto"][];
+                };
+            };
+        };
+    };
+    MatchingController_sendOffers: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SendOffersDto"];
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfferDto"][];
+                };
+            };
+        };
+    };
+    OffersController_list: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OfferDto"][];
+                };
+            };
+        };
+    };
+    OffersController_accept: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AssignmentDto"];
+                };
+            };
+        };
+    };
+    OffersController_decline: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    TrackingController_redirect: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                /** @description The assignment’s tracking token. */
+                token: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Redirect to the campaign destination. */
+            302: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Unknown token. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    EvidenceController_submit: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                    public_url?: string;
+                    note?: string;
+                };
+            };
+        };
+        responses: {
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionDto"];
+                };
+            };
+        };
+    };
+    EvidenceController_list: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SubmissionDto"][];
                 };
             };
         };
