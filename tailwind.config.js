@@ -21,7 +21,7 @@ export default {
         warn: { DEFAULT: '#C98A00', wash: '#FBF1DA' },
       },
       fontFamily: {
-        sans: ['Plus Jakarta Sans', 'Inter', 'system-ui', 'sans-serif'],
+        sans: ['var(--font-urbanist)', 'system-ui', 'sans-serif'],
       },
       borderRadius: {
         xl: '0.9rem',
