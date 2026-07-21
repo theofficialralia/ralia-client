@@ -145,6 +145,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/auth/change-password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change password
+         * @description Requires the current password. Revokes all other sessions on success.
+         */
+        post: operations["AuthController_changePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/promoters/me/profile": {
         parameters: {
             query?: never;
@@ -337,6 +357,27 @@ export interface paths {
         options?: never;
         head?: never;
         patch?: never;
+        trace?: never;
+    };
+    "/v1/clients/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The current business profile */
+        get: operations["ClientsController_me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update business details
+         * @description Partial — only the fields sent are changed.
+         */
+        patch: operations["ClientsController_update"];
         trace?: never;
     };
     "/v1/dashboard/summary": {
@@ -930,6 +971,10 @@ export interface components {
             status: string;
             phone_verified_at: Record<string, never> | null;
         };
+        ChangePasswordDto: {
+            current_password: string;
+            new_password: string;
+        };
         ProfileDto: {
             /** Format: uuid */
             user_id: string;
@@ -1188,6 +1233,43 @@ export interface components {
              * @example 3
              */
             active_filters: number;
+        };
+        ClientProfileDto: {
+            /** Format: uuid */
+            org_id: string;
+            name: string;
+            /** @description The account login email. Read-only here — changing it needs re-verification. */
+            email: string;
+            industry: Record<string, never> | null;
+            phone_whatsapp: Record<string, never> | null;
+            website: Record<string, never> | null;
+            address: Record<string, never> | null;
+            cac_number: Record<string, never> | null;
+            support_contact_name: Record<string, never> | null;
+            support_contact_phone: Record<string, never> | null;
+            description: Record<string, never> | null;
+            /** @example ACTIVE */
+            status: string;
+        };
+        UpdateClientProfileDto: {
+            /** @example Skinsmith Ltd */
+            name?: string;
+            /** @example Food & Drink */
+            industry?: string;
+            /** @example +2348035550192 */
+            phone_whatsapp?: string;
+            /** @example instagram.com/skinsmith */
+            website?: string;
+            /** @example Street, city, state */
+            address?: string;
+            /** @example RC 1234567 */
+            cac_number?: string;
+            /** @example David Blake */
+            support_contact_name?: string;
+            /** @example +2348035550192 */
+            support_contact_phone?: string;
+            /** @example A couple of sentences about what you do. */
+            description?: string;
         };
         DashboardCampaignRowDto: {
             /** Format: uuid */
@@ -1665,6 +1747,30 @@ export interface operations {
             };
         };
     };
+    AuthController_changePassword: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangePasswordDto"];
+            };
+        };
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     PromotersController_getProfile: {
         parameters: {
             query?: never;
@@ -2059,6 +2165,54 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    ClientsController_me: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientProfileDto"];
+                };
+            };
+        };
+    };
+    ClientsController_update: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateClientProfileDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ClientProfileDto"];
+                };
             };
         };
     };

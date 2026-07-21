@@ -61,7 +61,14 @@ export function Sidebar() {
         </button>
       </div>
 
-      <div className="m-3 flex items-center gap-3 rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+      <Link
+        href="/settings"
+        className={`m-3 flex items-center gap-3 rounded-2xl border p-3 transition ${
+          pathname.startsWith('/settings')
+            ? 'border-white/20 bg-white/[0.08]'
+            : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.07]'
+        }`}
+      >
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand text-[13px] font-bold text-white">
           {initials(user?.email)}
         </span>
@@ -69,7 +76,7 @@ export function Sidebar() {
           <div className="truncate text-[14px] font-bold">{user?.email?.split('@')[0] ?? 'Account'}</div>
           <div className="truncate text-[12px] text-white/50">{user?.email}</div>
         </div>
-      </div>
+      </Link>
     </aside>
   );
 }

@@ -103,6 +103,21 @@ export function uuid(): string {
 export type Tokens = { access_token: string; refresh_token: string; expires_in: number; token_type: string };
 export type Me = { id: string; email: string; phone_e164: string; roles: string[]; status: string };
 
+export type ClientProfile = {
+  org_id: string;
+  name: string;
+  email: string;
+  industry: string | null;
+  phone_whatsapp: string | null;
+  website: string | null;
+  address: string | null;
+  cac_number: string | null;
+  support_contact_name: string | null;
+  support_contact_phone: string | null;
+  description: string | null;
+  status: string;
+};
+
 export type CampaignStatus =
   | 'DRAFT' | 'QUOTED' | 'PENDING_APPROVAL' | 'REJECTED' | 'CONFIRMING_PAYMENT'
   | 'LIVE' | 'PAUSED' | 'ENDED' | 'FULFILLED' | 'SETTLED' | 'CANCELLED';
