@@ -117,7 +117,7 @@ function DeleteAccountModal({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-4 backdrop-blur-sm animate-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in" onClick={onClose}>
       <div className="w-full max-w-md rounded-2xl bg-paper p-6 sm:p-7" onClick={(e) => e.stopPropagation()}>
         <h3 className="text-[19px] font-extrabold text-ink">Delete your account?</h3>
         <p className="mt-2 text-[13.5px] text-muted">

@@ -18,7 +18,7 @@ function PathCard({ title, accent, body, href }: { title: string; accent: string
       <p className="mt-2 flex-1 text-[13.5px] leading-relaxed text-muted">{body}</p>
       <Link
         href={href}
-        className="mt-5 inline-flex items-center gap-2 self-start rounded-full bg-ink py-2 pl-4 pr-2 text-[13px] font-semibold text-white transition hover:bg-ink/90"
+        className="mt-5 inline-flex items-center gap-2 self-start rounded-full bg-sidebar py-2 pl-4 pr-2 text-[13px] font-semibold text-white transition hover:opacity-90"
       >
         Proceed
         <span className="grid h-6 w-6 place-items-center rounded-full bg-brand">

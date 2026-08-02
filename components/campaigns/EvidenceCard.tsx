@@ -32,10 +32,10 @@ export function EvidenceCard({ item, onOpen }: { item: EvidenceItem; onOpen: () 
           </div>
         )}
 
-        <span className="absolute left-2.5 top-2.5 rounded-full bg-ink/75 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">
+        <span className="absolute left-2.5 top-2.5 rounded-full bg-black/70 px-2.5 py-1 text-[11px] font-semibold text-white backdrop-blur">
           {platformLabel(item.platform)}
         </span>
-        <span className="absolute right-2.5 top-2.5 rounded-full bg-ink/60 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
+        <span className="absolute right-2.5 top-2.5 rounded-full bg-black/55 px-2.5 py-1 text-[11px] font-medium text-white backdrop-blur">
           {timeAgo(item.submitted_at)}
         </span>
 

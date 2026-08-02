@@ -15,7 +15,7 @@ export function Sidebar() {
   const { user, logout } = useAuth();
 
   return (
-    <aside className="flex w-[260px] shrink-0 flex-col border-r border-rule bg-ink text-white">
+    <aside className="flex w-[260px] shrink-0 flex-col border-r border-rule bg-sidebar text-white">
       <div className="px-5 py-6">
         <Logo label="Businesses" className="[&_div]:text-white [&_.text-muted]:text-white/50" />
       </div>

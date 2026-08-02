@@ -11,6 +11,8 @@
   --rule: 238 222 222;
   --ok-wash: 233 244 233;
   --warn-wash: 251 241 218;
+  /* The sidebar and hero stay dark in both themes. */
+  --sidebar: 26 18 19;
 }
 
 :root.dark {
@@ -22,6 +24,7 @@
   --rule: 54 44 45;
   --ok-wash: 26 40 28;
   --warn-wash: 46 38 20;
+  --sidebar: 14 11 12;
 }
 
 @layer base {

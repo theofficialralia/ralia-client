@@ -11,7 +11,7 @@ const variants: Record<Variant, string> = {
   primary: 'bg-brand text-white hover:bg-brand-600 focus-visible:ring-brand/25 shadow-[0_8px_20px_rgba(247,9,9,0.25)]',
   secondary: 'bg-paper text-ink border border-rule hover:bg-wash focus-visible:ring-brand/15',
   ghost: 'text-brand-700 hover:bg-brand/5 focus-visible:ring-brand/15',
-  dark: 'bg-ink text-white hover:bg-ink/90 focus-visible:ring-ink/20',
+  dark: 'bg-sidebar text-white hover:opacity-90 focus-visible:ring-black/20',
 };
 
 const sizes = {

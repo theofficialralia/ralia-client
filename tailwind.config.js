@@ -19,6 +19,7 @@ export default {
         rule: 'rgb(var(--rule) / <alpha-value>)',
         wash: 'rgb(var(--wash) / <alpha-value>)',
         paper: 'rgb(var(--paper) / <alpha-value>)',
+        sidebar: 'rgb(var(--sidebar) / <alpha-value>)',
         ok: { DEFAULT: '#2f9e44', wash: 'rgb(var(--ok-wash) / <alpha-value>)' },
         warn: { DEFAULT: '#c98a00', wash: 'rgb(var(--warn-wash) / <alpha-value>)' },
       },

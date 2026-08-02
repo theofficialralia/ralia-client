@@ -138,7 +138,7 @@ function Lightbox({ item, onClose }: { item: EvidenceItem; onClose: () => void }
   const showImage = item.image_url && item.image_url.startsWith('http');
   return (
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-ink/70 p-4 backdrop-blur-sm animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in"
       onClick={onClose}
     >
       <div className="w-full max-w-md overflow-hidden rounded-2xl bg-paper" onClick={(e) => e.stopPropagation()}>
