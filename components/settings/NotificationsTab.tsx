@@ -14,15 +14,18 @@ const ROWS = [
 export function NotificationsTab() {
   // Local only for now — there is no notification-preferences endpoint yet
   // (the notifications module is a deferred slice). Wiring is an integration step.
+  //
+  // Opt-in by default (NDPA): money/operational updates start on, but marketing
+  // (Product updates) starts off — the user turns it on deliberately.
   const [prefs, setPrefs] = useState<Record<string, { email: boolean; push: boolean }>>(
-    Object.fromEntries(ROWS.map((r) => [r.key, { email: true, push: true }])),
+    Object.fromEntries(ROWS.map((r) => [r.key, r.key === 'product' ? { email: false, push: false } : { email: true, push: true }])),
   );
 
   return (
     <section className="card p-6 sm:p-8">
       <h2 className="text-[19px] font-extrabold tracking-tight text-ink">Notification preferences</h2>
       <p className="mt-1 text-[13.5px] text-muted">
-        Choose how you hear about each kind of update. Email and WhatsApp are recommended for anything money-related.
+        Choose how you hear about each kind of update. Keep email and push on for anything money-related.
       </p>
       <p className="mt-3 inline-block rounded-full bg-warn-wash px-3 py-1 text-[12px] font-semibold text-warn">
         Preview — saving preferences arrives with notifications

@@ -1,24 +1,26 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: ['./app/**/*.{ts,tsx}', './components/**/*.{ts,tsx}', './lib/**/*.{ts,tsx}'],
   theme: {
     extend: {
       colors: {
-        // Brand palette, taken from the Ralia design system.
+        // Brand red reads on both themes; the rest are CSS variables that flip in
+        // .dark (see globals.css), as RGB triplets so opacity modifiers still work.
         brand: {
           DEFAULT: '#F70909',
           600: '#E00808',
           700: '#B0111B',
           800: '#7C0D14',
         },
-        ink: '#2A1516',
-        body: '#3A2C2D',
-        muted: '#8A7877',
-        rule: '#EEDEDE',
-        wash: '#FCF6F6',
-        paper: '#FFFFFF',
-        ok: { DEFAULT: '#349933', wash: '#E9F4E9' },
-        warn: { DEFAULT: '#C98A00', wash: '#FBF1DA' },
+        ink: 'rgb(var(--ink) / <alpha-value>)',
+        body: 'rgb(var(--body) / <alpha-value>)',
+        muted: 'rgb(var(--muted) / <alpha-value>)',
+        rule: 'rgb(var(--rule) / <alpha-value>)',
+        wash: 'rgb(var(--wash) / <alpha-value>)',
+        paper: 'rgb(var(--paper) / <alpha-value>)',
+        ok: { DEFAULT: '#2f9e44', wash: 'rgb(var(--ok-wash) / <alpha-value>)' },
+        warn: { DEFAULT: '#c98a00', wash: 'rgb(var(--warn-wash) / <alpha-value>)' },
       },
       fontFamily: {
         sans: ['var(--font-urbanist)', 'system-ui', 'sans-serif'],
@@ -28,7 +30,7 @@ export default {
         '2xl': '1.25rem',
       },
       boxShadow: {
-        card: '0 1px 2px rgba(42,21,22,0.04), 0 8px 24px rgba(42,21,22,0.05)',
+        card: '0 1px 2px rgba(0,0,0,0.05), 0 8px 24px rgba(0,0,0,0.06)',
       },
       keyframes: {
         'fade-in': { from: { opacity: '0', transform: 'translateY(4px)' }, to: { opacity: '1', transform: 'none' } },

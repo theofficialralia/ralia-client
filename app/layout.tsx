@@ -15,9 +15,15 @@ export const metadata: Metadata = {
   description: 'Fund campaigns, reach real audiences through everyday promoters, and see proof of every post.',
 };
 
+// Apply the stored/system theme before first paint to avoid a flash.
+const noFlash = `(function(){try{var t=localStorage.getItem('ralia.theme');if(t==='dark'||(!t&&window.matchMedia('(prefers-color-scheme: dark)').matches)){document.documentElement.classList.add('dark');}}catch(e){}})();`;
+
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={urbanist.variable}>
+    <html lang="en" className={urbanist.variable} suppressHydrationWarning>
+      <head>
+        <script dangerouslySetInnerHTML={{ __html: noFlash }} />
+      </head>
       <body>
         <Providers>{children}</Providers>
       </body>
