@@ -586,6 +586,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/promoters/{id}/kyc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Set a promoter’s KYC state (§10)
+         * @description Gates cash-out — a payout can only be approved once KYC is VERIFIED.
+         */
+        post: operations["AdminController_setKyc"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/live-campaigns": {
         parameters: {
             query?: never;
@@ -820,6 +840,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/withdrawals/{id}/fail": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Fail a not-yet-paid withdrawal (reason required)
+         * @description REQUESTED/APPROVED → FAILED. The balance is untouched — nothing was posted yet.
+         */
+        post: operations["AdminController_failWithdrawal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/withdrawals/{id}/reverse": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reverse a paid withdrawal that bounced (reason required)
+         * @description DR BANK_CLEARING / CR PROMOTER_AVAILABLE — funds return to the promoter’s balance. Requires an Idempotency-Key.
+         */
+        post: operations["AdminController_reverseWithdrawal"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/reconciliation": {
         parameters: {
             query?: never;
@@ -832,6 +892,26 @@ export interface paths {
          * @description Per charge: campaign price vs gateway-reported vs the escrow credit the ledger holds. ledger_matches_gateway is the overall proof.
          */
         get: operations["AdminController_reconciliation"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/finance/exposure": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Platform exposure & payout liability (§10)
+         * @description Money position by account kind + the payout obligation in flight. promoter_payable is fully backed by settled escrow — fully_backed proves it.
+         */
+        get: operations["AdminController_exposure"];
         put?: never;
         post?: never;
         delete?: never;
@@ -1789,6 +1869,13 @@ export interface components {
                 [key: string]: number;
             };
         };
+        SetKycDto: {
+            /**
+             * @example VERIFIED
+             * @enum {string}
+             */
+            status: "NONE" | "PENDING" | "VERIFIED" | "REJECTED";
+        };
         FundCampaignDto: {
             /**
              * @description Amount received, in kobo. Must equal the campaign price.
@@ -1869,6 +1956,25 @@ export interface components {
             /** @example 0 */
             mismatched: number;
             payments: components["schemas"]["GatewayPaymentDto"][];
+        };
+        ExposureReportDto: {
+            /** @description Total owed to promoters (Σ PROMOTER_AVAILABLE) — fully backed by settled escrow. */
+            promoter_payable: components["schemas"]["MoneyDto"];
+            /** @description Requested/approved payouts not yet paid. */
+            in_flight_withdrawals: components["schemas"]["MoneyDto"];
+            /** @description Client funds committed to live campaigns (Σ CAMPAIGN_ESCROW). */
+            escrow_held: components["schemas"]["MoneyDto"];
+            /** @description Refunded remainders sitting in client wallets. */
+            client_wallet: components["schemas"]["MoneyDto"];
+            /** @description Ralia’s cumulative take. */
+            platform_revenue: components["schemas"]["MoneyDto"];
+            /** @description Net cash position (debits − credits on BANK_CLEARING). */
+            bank_clearing_net: components["schemas"]["MoneyDto"];
+            /**
+             * @description Promoter obligations are never an unfunded promise.
+             * @example true
+             */
+            fully_backed: boolean;
         };
         SettleGatewayPaymentDto: {
             /**
@@ -2140,6 +2246,11 @@ export interface components {
              * @example true
              */
             can_withdraw: boolean;
+            /**
+             * @description KYC gate for payout — must be VERIFIED before a withdrawal is approved.
+             * @enum {string}
+             */
+            kyc_status: "NONE" | "PENDING" | "VERIFIED" | "REJECTED";
         };
         WithdrawalDto: {
             /** Format: uuid */
@@ -3129,6 +3240,34 @@ export interface operations {
             };
         };
     };
+    AdminController_setKyc: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetKycDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDecisionDto"];
+                };
+            };
+        };
+    };
     AdminController_liveCampaigns: {
         parameters: {
             query?: never;
@@ -3440,6 +3579,63 @@ export interface operations {
             };
         };
     };
+    AdminController_failWithdrawal: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDecisionDto"];
+                };
+            };
+        };
+    };
+    AdminController_reverseWithdrawal: {
+        parameters: {
+            query?: never;
+            header: {
+                "idempotency-key": string;
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDecisionDto"];
+                };
+            };
+        };
+    };
     AdminController_reconciliation: {
         parameters: {
             query?: never;
@@ -3458,6 +3654,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ReconciliationReportDto"];
+                };
+            };
+        };
+    };
+    AdminController_exposure: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExposureReportDto"];
                 };
             };
         };
