@@ -20,6 +20,60 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/notifications": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My notifications
+         * @description Newest first, with the unread count for a badge.
+         */
+        get: operations["NotificationController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/{id}/read": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark one notification read */
+        post: operations["NotificationController_markRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/notifications/read-all": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Mark all my notifications read */
+        post: operations["NotificationController_markAllRead"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/auth/register": {
         parameters: {
             query?: never;
@@ -321,6 +375,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/campaigns/{id}/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Preview price for a budget or slot count
+         * @description Stateless budget↔reach preview — solves slots/reach for a budget (or prices a slot count). Persists nothing; use it to drive the slider, then quote to commit.
+         */
+        post: operations["CampaignsController_plan"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/campaigns/{id}/submit": {
         parameters: {
             query?: never;
@@ -492,6 +566,66 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/promoters/{id}/capability": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Override a promoter’s per-role capability (§3)
+         * @description Merges the given 0–100 scores over the computed ones and records the confirmation.
+         */
+        post: operations["AdminController_setCapability"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/live-campaigns": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Live/paused campaigns
+         * @description The campaigns an admin can match promoters to.
+         */
+        get: operations["AdminController_liveCampaigns"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/campaigns/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Campaign detail for review
+         * @description Client, brief, targeting and assets — for approval and matching context.
+         */
+        get: operations["AdminController_campaignDetail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/campaigns/{id}/approve": {
         parameters: {
             query?: never;
@@ -506,6 +640,26 @@ export interface paths {
          * @description Moves it to CONFIRMING_PAYMENT; funding makes it LIVE.
          */
         post: operations["AdminController_approveCampaign"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/campaigns/{id}/allocate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Run one hybrid allocation pass
+         * @description Extends offers to the best-fit candidates (head-start then open free-to-air), over-offering in the open phase. Idempotent.
+         */
+        post: operations["AdminController_allocateCampaign"];
         delete?: never;
         options?: never;
         head?: never;
@@ -549,6 +703,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/admin/channels/{id}/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Verify a channel’s audience evidence
+         * @description Sets the verification tier (screenshot/insights), stamps verified_at, and recomputes effective reach — lifting the self-reported cap.
+         */
+        post: operations["AdminController_verifyChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/channels/{id}/unverify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Drop a channel to self-reported (reason required)
+         * @description Clears verified_at and re-caps reach when a proof is bad or stale.
+         */
+        post: operations["AdminController_unverifyChannel"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/submissions/{id}/approve": {
         parameters: {
             query?: never;
@@ -559,8 +753,8 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Approve proof and pay the promoter
-         * @description Fee to the promoter and Ralia’s take leave escrow in one balanced transaction. Requires an Idempotency-Key.
+         * Approve proof and settle the promoter pro-rata
+         * @description Pays the promoter pro-rata on verified_views, takes Ralia’s cut, and refunds the undelivered remainder to the client — all in one balanced transaction. A delivery below the threshold is refused (reject instead). Requires an Idempotency-Key.
          */
         post: operations["AdminController_approveSubmission"];
         delete?: never;
@@ -626,7 +820,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/dashboard/summary": {
+    "/v1/admin/reconciliation": {
         parameters: {
             query?: never;
             header?: never;
@@ -634,10 +828,10 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * Client dashboard summary
-         * @description Top-line spend, views and promoter counts, plus a per-campaign rollup for the table.
+         * Reconcile gateway charges against the ledger
+         * @description Per charge: campaign price vs gateway-reported vs the escrow credit the ledger holds. ledger_matches_gateway is the overall proof.
          */
-        get: operations["AnalyticsController_summary"];
+        get: operations["AdminController_reconciliation"];
         put?: never;
         post?: never;
         delete?: never;
@@ -646,27 +840,7 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/v1/campaigns/{id}/analytics": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /**
-         * Campaign analytics and evidence gallery
-         * @description Views delivered, offer acceptance, completion, amount spent, and every verified/pending submission with its screenshot — the four SOW metrics plus the evidence gallery (handoff §6).
-         */
-        get: operations["AnalyticsController_campaign"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/v1/campaigns/{id}/payments/paystack/verify": {
+    "/v1/admin/reconciliation/{id}/settle": {
         parameters: {
             query?: never;
             header?: never;
@@ -676,10 +850,171 @@ export interface paths {
         get?: never;
         put?: never;
         /**
-         * Confirm a Paystack payment and fund the campaign
-         * @description The reference is verified server-side with Paystack before any money moves. On success the campaign escrow is credited and the campaign goes LIVE. Idempotent on the Paystack reference.
+         * Confirm a gateway settlement cleared
+         * @description RECORDED → SETTLED, recording the settlement reference and the amount actually settled (net of gateway fees).
          */
-        post: operations["PaymentsController_verify"];
+        post: operations["AdminController_settleGatewayPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/reconciliation/{id}/flag": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Flag a settlement discrepancy (reason required)
+         * @description → MISMATCH for finance to investigate.
+         */
+        post: operations["AdminController_flagGatewayPayment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/clients": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * All clients
+         * @description Client orgs with campaigns created and amount spent.
+         */
+        get: operations["AdminController_clients"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/clients/{id}/deactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Deactivate a client
+         * @description Suspends the client org.
+         */
+        post: operations["AdminController_deactivateClient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/clients/{id}/reactivate": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Reactivate a client */
+        post: operations["AdminController_reactivateClient"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/rate-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Platform rules
+         * @description The tunable coefficients. Changing them never reprices a quoted campaign.
+         */
+        get: operations["AdminController_rateConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update platform rules
+         * @description Only the fields sent change. Audited.
+         */
+        patch: operations["AdminController_updateRateConfig"];
+        trace?: never;
+    };
+    "/v1/admin/audit-log": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Audit log
+         * @description Recent money- and score-affecting writes, attributed to the admin.
+         */
+        get: operations["AdminController_auditLog"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/team": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Admin team
+         * @description Admins and their capabilities.
+         */
+        get: operations["AdminController_team"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/admin/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Platform analytics
+         * @description GMV, revenue, active counts and status breakdowns.
+         */
+        get: operations["AdminController_analytics"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -768,6 +1103,86 @@ export interface paths {
         put?: never;
         /** Decline an offer */
         post: operations["OffersController_decline"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/assignments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My assignments
+         * @description The campaigns I accepted, with what to do and the latest verdict.
+         */
+        get: operations["AssignmentsController_myAssignments"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/dashboard/summary": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Client dashboard summary
+         * @description Top-line spend, views and promoter counts, plus a per-campaign rollup for the table.
+         */
+        get: operations["AnalyticsController_summary"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/campaigns/{id}/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Campaign analytics and evidence gallery
+         * @description Views delivered, offer acceptance, completion, amount spent, and every verified/pending submission with its screenshot — the four SOW metrics plus the evidence gallery (handoff §6).
+         */
+        get: operations["AnalyticsController_campaign"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/campaigns/{id}/payments/paystack/verify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Confirm a Paystack payment and fund the campaign
+         * @description The reference is verified server-side with Paystack before any money moves. On success the campaign escrow is credited and the campaign goes LIVE. Idempotent on the Paystack reference.
+         */
+        post: operations["PaymentsController_verify"];
         delete?: never;
         options?: never;
         head?: never;
@@ -888,6 +1303,26 @@ export interface components {
              */
             db: "up" | "down";
         };
+        NotificationDto: {
+            /** Format: uuid */
+            id: string;
+            /** @example offer.created */
+            type: string;
+            title: string;
+            body: string;
+            /** @description Structured payload (ids, amounts) for deep-linking. */
+            data: {
+                [key: string]: unknown;
+            } | null;
+            read: boolean;
+            /** Format: date-time */
+            created_at: string;
+        };
+        NotificationListDto: {
+            items: components["schemas"]["NotificationDto"][];
+            /** @description How many are still unread. */
+            unread: number;
+        };
         RegisterDto: {
             /** @example ada@example.com */
             email: string;
@@ -972,6 +1407,8 @@ export interface components {
             email: string;
             phone_e164: string;
             roles: ("CLIENT" | "PROMOTER" | "ADMIN")[];
+            /** @description Admin capabilities, flattened across roles. */
+            capabilities: ("REVIEW_EVIDENCE" | "RECORD_MONEY")[];
             status: string;
             phone_verified_at: Record<string, never> | null;
         };
@@ -1000,6 +1437,16 @@ export interface components {
              * @example 50
              */
             trust_score: number;
+            /** @description Roles this promoter offers. */
+            roles: ("DISTRIBUTOR" | "CREATOR" | "PARTICIPATOR" | "INFLUENCER")[];
+            /** @description Self-reported capability factors (0–1). */
+            capability_inputs: {
+                [key: string]: number;
+            } | null;
+            /** @description Admin-confirmed per-role capability (0–100). */
+            capability_scores: {
+                [key: string]: number;
+            } | null;
             /**
              * @description True once every required field is present and at least one channel exists.
              * @example false
@@ -1044,6 +1491,12 @@ export interface components {
             preferred_categories?: string[];
             /** @example 3 */
             max_campaigns_per_week?: number;
+            /** @description The roles this promoter offers. */
+            roles?: ("DISTRIBUTOR" | "CREATOR" | "PARTICIPATOR" | "INFLUENCER")[];
+            /** @description Self-reported capability factors, each normalised 0–1. */
+            capability_inputs?: {
+                [key: string]: number;
+            };
         };
         ChannelDto: {
             /** Format: uuid */
@@ -1238,6 +1691,41 @@ export interface components {
              */
             active_filters: number;
         };
+        PlanRequestDto: {
+            /**
+             * @description Budget in kobo — solves for how many slots it buys.
+             * @example 500000
+             */
+            budget_minor?: number;
+            /**
+             * @description Slot count — prices that many slots directly.
+             * @example 12
+             */
+            slots?: number;
+        };
+        CampaignPlanDto: {
+            /** @description Per-slot price at current targeting. */
+            unit_price: components["schemas"]["MoneyDto"];
+            /**
+             * @description Slots this plan buys.
+             * @example 12
+             */
+            slots: number;
+            /** @description Total price = unit_price × slots. */
+            total_price: components["schemas"]["MoneyDto"];
+            /** @description What one promoter earns per slot. */
+            promoter_fee: components["schemas"]["MoneyDto"];
+            /**
+             * @description Per-slot reach basis (targeting.min_effective_reach).
+             * @example 2000
+             */
+            reach_per_slot: number;
+            /**
+             * @description Estimated total reach = slots × reach_per_slot.
+             * @example 24000
+             */
+            estimated_total_reach: number;
+        };
         ClientProfileDto: {
             /** Format: uuid */
             org_id: string;
@@ -1289,6 +1777,18 @@ export interface components {
             /** @example Screenshot does not show the campaign creative. */
             reason: string;
         };
+        SetCapabilityDto: {
+            /**
+             * @description Per-role capability, 0–100. Merged over the computed scores.
+             * @example {
+             *       "DISTRIBUTOR": 78,
+             *       "CREATOR": 60
+             *     }
+             */
+            scores: {
+                [key: string]: number;
+            };
+        };
         FundCampaignDto: {
             /**
              * @description Amount received, in kobo. Must equal the campaign price.
@@ -1301,12 +1801,188 @@ export interface components {
              */
             reference?: string;
         };
+        VerifyChannelDto: {
+            /**
+             * @description The tier the evidence supports. SELF is not a verification — use unverify to drop a channel back.
+             * @example SCREENSHOT
+             * @enum {string}
+             */
+            tier: "SCREENSHOT" | "INSIGHTS";
+        };
+        ApproveSubmissionDto: {
+            /**
+             * @description Admin-verified delivered effective views. Drives pro-rata pay; below the delivery threshold, approval is refused.
+             * @example 842
+             */
+            verified_views: number;
+        };
         RecordWithdrawalPaidDto: {
             /**
              * @description Reference of the transfer the admin sent.
              * @example Zenith transfer ref 552117
              */
             paid_ref: string;
+        };
+        GatewayPaymentDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            campaign_id: string;
+            /** @example RLA-9F2K-84B */
+            reference: string;
+            /** @description The campaign price the charge was for. */
+            expected: components["schemas"]["MoneyDto"];
+            /** @description What the gateway reported at verify time. */
+            gateway: components["schemas"]["MoneyDto"];
+            /** @description The escrow credit the ledger actually holds for this reference. */
+            ledger: components["schemas"]["MoneyDto"];
+            /**
+             * @description Whether the ledger credit equals the gateway amount.
+             * @example true
+             */
+            matched: boolean;
+            /** @enum {string} */
+            status: "RECORDED" | "SETTLED" | "MISMATCH";
+            /** @description Amount confirmed settled, once reconciled. */
+            settled: components["schemas"]["MoneyDto"] | null;
+            settlement_ref: Record<string, never> | null;
+            /** Format: date-time */
+            settled_at: Record<string, never> | null;
+        };
+        ReconciliationReportDto: {
+            /** @description Total the gateway reported across all charges. */
+            gateway_total: components["schemas"]["MoneyDto"];
+            /** @description Total confirmed settled. */
+            settled_total: components["schemas"]["MoneyDto"];
+            /**
+             * @description True when every ledger escrow credit equals its gateway amount.
+             * @example true
+             */
+            ledger_matches_gateway: boolean;
+            /**
+             * @description Charges awaiting settlement confirmation.
+             * @example 3
+             */
+            recorded: number;
+            /** @example 10 */
+            settled: number;
+            /** @example 0 */
+            mismatched: number;
+            payments: components["schemas"]["GatewayPaymentDto"][];
+        };
+        SettleGatewayPaymentDto: {
+            /**
+             * @description The gateway settlement batch reference.
+             * @example PSTK_STL_20260803
+             */
+            settlement_ref: string;
+            /**
+             * @description Amount actually settled, in kobo (net of gateway fees).
+             * @example 261000
+             */
+            settled_minor: number;
+        };
+        RateConfigUpdateDto: {
+            /**
+             * @description RPM — kobo per 1,000 effective views.
+             * @example 3000
+             */
+            rpm_minor?: number;
+            /**
+             * @description Ralia take rate, whole percent.
+             * @example 30
+             */
+            take_rate_pct?: number;
+            /**
+             * @description Delivery threshold τ, whole percent of promised.
+             * @example 70
+             */
+            delivery_threshold_pct?: number;
+            /**
+             * @description Self-reported effective-reach cap.
+             * @example 2000
+             */
+            unverified_reach_cap?: number;
+            /**
+             * @description Proof validity window, days.
+             * @example 90
+             */
+            proof_validity_days?: number;
+            /**
+             * @description Minimum trust score to be matched.
+             * @example 30
+             */
+            min_trust_score?: number;
+            /**
+             * @description Offer accept window, hours.
+             * @example 24
+             */
+            offer_expiry_hours?: number;
+            /**
+             * @description Minimum withdrawal, kobo.
+             * @example 500000
+             */
+            withdrawal_minimum_minor?: number;
+        };
+        CandidateChannelDto: {
+            /** Format: uuid */
+            id: string;
+            platform: string;
+            effective_reach: number;
+        };
+        CandidateDto: {
+            /** Format: uuid */
+            promoter_id: string;
+            full_name: Record<string, never> | null;
+            location_state: Record<string, never> | null;
+            trust_score: number;
+            channel: components["schemas"]["CandidateChannelDto"];
+            assignments_this_week: number;
+            max_campaigns_per_week: number;
+            /** @description Performance-weighted match score, 0–1 (ALGORITHMS.md §7). */
+            match_score: number;
+            /** @description match_score as a whole-percent "Fit %". */
+            fit_pct: number;
+            /** @description Per-role capability, 0–100. */
+            capability: number;
+            /** @example Established */
+            capability_tier: string;
+            /** @description Reliability, 0–1. */
+            reliability: number;
+        };
+        SendOffersDto: {
+            /** @description Promoter ids from the candidates list. */
+            promoter_ids: string[];
+        };
+        OfferDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            campaign_id: string;
+            campaign_name: string;
+            role: string;
+            /**
+             * @description What the promoter earns, in kobo.
+             * @example 2415
+             */
+            fee_minor: number;
+            /** Format: date-time */
+            expires_at: string;
+            status: string;
+            /** @description Frozen match "Fit %" (0–100) this offer was ranked at, or null for legacy offers. */
+            fit_pct: Record<string, never> | null;
+        };
+        AssignmentDto: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            campaign_id: string;
+            role: string;
+            /** @example 2415 */
+            fee_minor: number;
+            /** @description The token behind this assignment’s tracking link. */
+            tracking_token: string;
+            status: string;
         };
         DashboardCampaignRowDto: {
             /** Format: uuid */
@@ -1425,54 +2101,6 @@ export interface components {
             /** @example Payment confirmed; your campaign is live. */
             message: string;
         };
-        CandidateChannelDto: {
-            /** Format: uuid */
-            id: string;
-            platform: string;
-            effective_reach: number;
-        };
-        CandidateDto: {
-            /** Format: uuid */
-            promoter_id: string;
-            full_name: Record<string, never> | null;
-            location_state: Record<string, never> | null;
-            trust_score: number;
-            channel: components["schemas"]["CandidateChannelDto"];
-            assignments_this_week: number;
-            max_campaigns_per_week: number;
-        };
-        SendOffersDto: {
-            /** @description Promoter ids from the candidates list. */
-            promoter_ids: string[];
-        };
-        OfferDto: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            campaign_id: string;
-            campaign_name: string;
-            role: string;
-            /**
-             * @description What the promoter earns, in kobo.
-             * @example 2415
-             */
-            fee_minor: number;
-            /** Format: date-time */
-            expires_at: string;
-            status: string;
-        };
-        AssignmentDto: {
-            /** Format: uuid */
-            id: string;
-            /** Format: uuid */
-            campaign_id: string;
-            role: string;
-            /** @example 2415 */
-            fee_minor: number;
-            /** @description The token behind this assignment’s tracking link. */
-            tracking_token: string;
-            status: string;
-        };
         SubmissionDto: {
             /** Format: uuid */
             id: string;
@@ -1490,6 +2118,13 @@ export interface components {
             auto_flag: boolean;
             public_url: Record<string, never> | null;
             note: Record<string, never> | null;
+            /**
+             * @description Views the promoter reported at submission.
+             * @example 842
+             */
+            claimed_views: Record<string, never> | null;
+            /** @description Admin-verified delivered views, once approved. */
+            verified_reach: Record<string, never> | null;
             /** Format: date-time */
             submitted_at: string;
         };
@@ -1551,6 +2186,72 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["HealthResponseDto"];
                 };
+            };
+        };
+    };
+    NotificationController_list: {
+        parameters: {
+            query: {
+                limit: string;
+            };
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NotificationListDto"];
+                };
+            };
+        };
+    };
+    NotificationController_markRead: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotificationController_markAllRead: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -2093,6 +2794,34 @@ export interface operations {
             };
         };
     };
+    CampaignsController_plan: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlanRequestDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignPlanDto"];
+                };
+            };
+        };
+    };
     CampaignsController_submit: {
         parameters: {
             query?: never;
@@ -2372,6 +3101,76 @@ export interface operations {
             };
         };
     };
+    AdminController_setCapability: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetCapabilityDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDecisionDto"];
+                };
+            };
+        };
+    };
+    AdminController_liveCampaigns: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminController_campaignDetail: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
     AdminController_approveCampaign: {
         parameters: {
             query?: never;
@@ -2393,6 +3192,28 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["AdminDecisionDto"];
                 };
+            };
+        };
+    };
+    AdminController_allocateCampaign: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -2453,6 +3274,62 @@ export interface operations {
             };
         };
     };
+    AdminController_verifyChannel: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyChannelDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDecisionDto"];
+                };
+            };
+        };
+    };
+    AdminController_unverifyChannel: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDecisionDto"];
+                };
+            };
+        };
+    };
     AdminController_approveSubmission: {
         parameters: {
             query?: never;
@@ -2466,7 +3343,11 @@ export interface operations {
             };
             cookie?: never;
         };
-        requestBody?: never;
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ApproveSubmissionDto"];
+            };
+        };
         responses: {
             200: {
                 headers: {
@@ -2559,7 +3440,7 @@ export interface operations {
             };
         };
     };
-    AnalyticsController_summary: {
+    AdminController_reconciliation: {
         parameters: {
             query?: never;
             header?: {
@@ -2576,12 +3457,88 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["DashboardSummaryDto"];
+                    "application/json": components["schemas"]["ReconciliationReportDto"];
                 };
             };
         };
     };
-    AnalyticsController_campaign: {
+    AdminController_settleGatewayPayment: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SettleGatewayPaymentDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDecisionDto"];
+                };
+            };
+        };
+    };
+    AdminController_flagGatewayPayment: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RejectDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDecisionDto"];
+                };
+            };
+        };
+    };
+    AdminController_clients: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminController_deactivateClient: {
         parameters: {
             query?: never;
             header?: {
@@ -2600,12 +3557,12 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content: {
-                    "application/json": components["schemas"]["CampaignAnalyticsDto"];
+                    "application/json": components["schemas"]["AdminDecisionDto"];
                 };
             };
         };
     };
-    PaymentsController_verify: {
+    AdminController_reactivateClient: {
         parameters: {
             query?: never;
             header?: {
@@ -2617,9 +3574,51 @@ export interface operations {
             };
             cookie?: never;
         };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDecisionDto"];
+                };
+            };
+        };
+    };
+    AdminController_rateConfig: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminController_updateRateConfig: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
         requestBody: {
             content: {
-                "application/json": components["schemas"]["VerifyPaystackDto"];
+                "application/json": components["schemas"]["RateConfigUpdateDto"];
             };
         };
         responses: {
@@ -2627,9 +3626,67 @@ export interface operations {
                 headers: {
                     [name: string]: unknown;
                 };
-                content: {
-                    "application/json": components["schemas"]["PaymentResultDto"];
+                content?: never;
+            };
+        };
+    };
+    AdminController_auditLog: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
                 };
+                content?: never;
+            };
+        };
+    };
+    AdminController_team: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminController_analytics: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -2750,6 +3807,100 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    AssignmentsController_myAssignments: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AnalyticsController_summary: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DashboardSummaryDto"];
+                };
+            };
+        };
+    };
+    AnalyticsController_campaign: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CampaignAnalyticsDto"];
+                };
+            };
+        };
+    };
+    PaymentsController_verify: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["VerifyPaystackDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PaymentResultDto"];
+                };
             };
         };
     };

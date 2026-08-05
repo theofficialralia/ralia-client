@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { api, ApiError, uuid, type Campaign, type Quote } from '@/lib/api';
+import { api, ApiError, uuid, type Campaign, type CampaignPlan, type Quote } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { CATEGORIES, LANGUAGES, OBJECTIVES, PLATFORMS, ROLES, STATES } from '@/lib/campaign-options';
 import { loadPaystack, PAYSTACK_PUBLIC_KEY, paystackConfigured } from '@/lib/paystack';
@@ -114,23 +114,22 @@ export default function NewCampaignPage() {
     }
   }
 
-  // Auto-quote when landing on step 4.
-  useEffect(() => {
-    if (step !== 4 || !campaignId || quote) return;
-    let cancelled = false;
-    (async () => {
-      setBusy(true); setError(null);
-      try {
-        const q = await api.post<Quote>(`/v1/campaigns/${campaignId}/quote`);
-        if (!cancelled) setQuote(q);
-      } catch (e) {
-        if (!cancelled) setError(e instanceof ApiError ? e.message : 'Could not price the campaign.');
-      } finally {
-        if (!cancelled) setBusy(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [step, campaignId, quote]);
+  // Lock in the plan the slider settled on: save the slot count, then freeze the
+  // price with a real quote. This is what enables "Continue to payment".
+  async function commitPlan(slots: number) {
+    if (!campaignId) return;
+    setBusy(true); setError(null);
+    try {
+      await api.patch(`/v1/campaigns/${campaignId}`, { slots_total: slots });
+      set({ slots_total: slots });
+      const q = await api.post<Quote>(`/v1/campaigns/${campaignId}/quote`);
+      setQuote(q);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not lock in the plan.');
+    } finally {
+      setBusy(false);
+    }
+  }
 
   async function pay() {
     if (!campaignId || !quote || !user) return;
@@ -193,7 +192,7 @@ export default function NewCampaignPage() {
         {step === 1 && <Brief s={s} set={set} />}
         {step === 2 && <Assets s={s} set={set} />}
         {step === 3 && <Targeting s={s} set={set} />}
-        {step === 4 && <QuoteStep quote={quote} busy={busy} slots={Number(s.slots_total)} />}
+        {step === 4 && campaignId && <QuoteStep campaignId={campaignId} initialSlots={Number(s.slots_total)} quote={quote} committing={busy} onCommit={commitPlan} onDirty={() => setQuote(null)} />}
         {step === 5 && <Fund quote={quote} />}
 
         {error && (
@@ -319,26 +318,94 @@ function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
   );
 }
 
-function QuoteStep({ quote, busy, slots }: { quote: Quote | null; busy: boolean; slots: number }) {
+const MAX_SLIDER_SLOTS = 60;
+
+function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDirty }: {
+  campaignId: string;
+  initialSlots: number;
+  quote: Quote | null;
+  committing: boolean;
+  onCommit: (slots: number) => void;
+  onDirty: () => void;
+}) {
+  const [plan, setPlan] = useState<CampaignPlan | null>(null);
+  const [budget, setBudget] = useState<number | null>(null); // kobo
+  const [loading, setLoading] = useState(true);
+  const [err, setErr] = useState<string | null>(null);
+
+  // Seed the plan (and the budget) from the slot count the client came in with.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const p = await api.post<CampaignPlan>(`/v1/campaigns/${campaignId}/plan`, { slots: initialSlots });
+        if (!cancelled) { setPlan(p); setBudget(p.total_price.amount_minor || p.unit_price.amount_minor); }
+      } catch (e) { if (!cancelled) setErr(e instanceof ApiError ? e.message : 'Could not price the campaign.'); }
+      finally { if (!cancelled) setLoading(false); }
+    })();
+    return () => { cancelled = true; };
+  }, [campaignId, initialSlots]);
+
+  // Re-price against the server as the slider settles (debounced) — the endpoint is
+  // the source of truth, so the total always snaps to whole slots the budget covers.
+  useEffect(() => {
+    if (budget == null) return;
+    const t = setTimeout(async () => {
+      try { setPlan(await api.post<CampaignPlan>(`/v1/campaigns/${campaignId}/plan`, { budget_minor: budget })); }
+      catch { /* keep the last good plan */ }
+    }, 220);
+    return () => clearTimeout(t);
+  }, [budget, campaignId]);
+
+  if (loading || !plan) {
+    return (
+      <div>
+        <Header title="Set your budget" subtitle="Trade budget for reach." />
+        <div className="py-10 text-center text-muted">{err ?? 'Pricing your campaign…'}</div>
+      </div>
+    );
+  }
+
+  const unit = plan.unit_price.amount_minor;
+  const max = unit * MAX_SLIDER_SLOTS;
+  const locked = quote != null && quote.slots_total === plan.slots;
+
   return (
     <div>
-      <Header title="Your quote" subtitle="Priced from your targeting. This price is locked in for this campaign." />
-      {busy || !quote ? (
-        <div className="py-10 text-center text-muted">Pricing your campaign…</div>
-      ) : (
-        <div className="mt-2 space-y-4">
-          <div className="rounded-2xl border border-brand/20 bg-brand/[0.03] p-6 text-center">
-            <p className="text-[13px] text-muted">Total campaign price</p>
-            <p className="mt-1 text-[36px] font-extrabold tracking-tight text-ink">{quote.price.amount_display}</p>
-            <p className="mt-1 text-[13px] text-muted">{quote.unit_price.amount_display} per slot × {slots} slots</p>
-          </div>
-          <div className="grid gap-3 sm:grid-cols-3">
-            <Mini label="Each promoter earns" value={quote.promoter_fee.amount_display} />
-            <Mini label="Eligible promoters" value={quote.eligible_promoters.toLocaleString('en-NG')} />
-            <Mini label="Est. reach" value={quote.estimated_reach.toLocaleString('en-NG')} />
-          </div>
+      <Header title="Set your budget" subtitle="Slide to trade budget for reach. We price whole slots, so the total snaps to what your budget fully covers." />
+      <div className="mt-2 space-y-5">
+        <div className="rounded-2xl border border-brand/20 bg-brand/[0.03] p-6 text-center">
+          <p className="text-[13px] text-muted">Total campaign price</p>
+          <p className="mt-1 text-[36px] font-extrabold tracking-tight text-ink">{plan.total_price.amount_display}</p>
+          <p className="mt-1 text-[13px] text-muted">{plan.unit_price.amount_display} per slot × {plan.slots} slots</p>
         </div>
-      )}
+
+        <div>
+          <input
+            type="range" min={unit} max={max} step={unit}
+            value={Math.min(Math.max(budget ?? unit, unit), max)}
+            onChange={(e) => { if (quote) onDirty(); setBudget(Number(e.target.value)); }}
+            className="w-full accent-brand"
+          />
+          <div className="flex justify-between text-[11px] text-muted"><span>1 slot</span><span>{MAX_SLIDER_SLOTS} slots</span></div>
+        </div>
+
+        <div className="grid gap-3 sm:grid-cols-3">
+          <Mini label="Slots (promoters)" value={plan.slots.toLocaleString('en-NG')} />
+          <Mini label="Est. total reach" value={plan.estimated_total_reach.toLocaleString('en-NG')} />
+          <Mini label="Each promoter earns" value={plan.promoter_fee.amount_display} />
+        </div>
+
+        {locked ? (
+          <div className="rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] font-semibold text-brand-700">
+            ✓ Locked in at {quote!.price.amount_display} — continue to payment.
+          </div>
+        ) : (
+          <Button className="w-full" loading={committing} disabled={plan.slots < 1} onClick={() => onCommit(plan.slots)}>
+            {plan.slots < 1 ? 'Raise your budget to cover a slot' : `Lock in ${plan.slots} slots`}
+          </Button>
+        )}
+      </div>
     </div>
   );
 }

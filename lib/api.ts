@@ -158,6 +158,15 @@ export type Quote = {
   active_filters: number;
 };
 
+export type CampaignPlan = {
+  unit_price: Money;
+  slots: number;
+  total_price: Money;
+  promoter_fee: Money;
+  reach_per_slot: number;
+  estimated_total_reach: number;
+};
+
 export type DashboardRow = {
   id: string;
   name: string;
