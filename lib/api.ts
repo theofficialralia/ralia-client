@@ -146,6 +146,7 @@ export type Campaign = {
   price: Money | null;
   budget: Money;
   quoted_at: string | null;
+  total_clicks?: number;
 };
 
 export type Quote = {
@@ -212,6 +213,7 @@ export type CampaignAnalytics = {
   spent: Money;
   budget: Money;
   views_delivered: number;
+  clicks_delivered: number;
   cost_per_view: Money;
   offers_sent: number;
   offers_accepted: number;

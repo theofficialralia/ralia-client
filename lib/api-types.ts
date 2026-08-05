@@ -1687,6 +1687,8 @@ export interface components {
             destination_url: Record<string, never>;
             slots_total: number;
             slots_filled: number;
+            /** @description Human clicks delivered — present on the single-campaign detail. */
+            total_clicks?: number;
             /** @description The price quoted, frozen at quote time. */
             price: components["schemas"]["MoneyDto"] | null;
             budget: components["schemas"]["MoneyDto"];
@@ -2168,6 +2170,11 @@ export interface components {
             budget: components["schemas"]["MoneyDto"];
             /** @example 41230 */
             views_delivered: number;
+            /**
+             * @description Human clicks driven through tracking links (bots excluded).
+             * @example 1820
+             */
+            clicks_delivered: number;
             /** @description spent ÷ views, or ₦0 when there are no views yet. */
             cost_per_view: components["schemas"]["MoneyDto"];
             /**

@@ -66,12 +66,17 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
       <h1 className="mt-2 text-[28px] font-extrabold tracking-tight text-ink">{data.name}</h1>
 
       {/* Stats */}
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         <Stat label="Amount spent" value={data.spent.amount_display} foot={`of ${data.budget.amount_display} budget`} />
         <Stat
           label="Views delivered"
           value={data.views_delivered.toLocaleString('en-NG')}
           foot={`${data.cost_per_view.amount_display} per view`}
+        />
+        <Stat
+          label="Clicks delivered"
+          value={data.clicks_delivered.toLocaleString('en-NG')}
+          foot="Real clicks to your link"
         />
         <Stat
           label="Accepted by promoters"
