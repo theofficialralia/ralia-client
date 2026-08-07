@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { api, ApiError, type ClientProfile } from '@/lib/api';
+import { api, ApiError, type ClientProfile, type ClientSocial } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, Textarea } from '@/components/ui/Field';
 
@@ -9,6 +9,16 @@ const SECTORS = [
   'Food & Drink', 'Fashion', 'Beauty', 'Tech', 'Finance', 'Health', 'Education',
   'Entertainment', 'Retail', 'Services', 'Other',
 ];
+
+const SOCIALS = [
+  { value: 'WHATSAPP', label: 'WhatsApp' },
+  { value: 'INSTAGRAM', label: 'Instagram' },
+  { value: 'X', label: 'X' },
+  { value: 'TIKTOK', label: 'TikTok' },
+  { value: 'FACEBOOK', label: 'Facebook' },
+];
+
+type SocialDetail = { url: string; followers: string };
 
 export function BusinessDetailsTab({ profile, onSaved }: { profile: ClientProfile; onSaved: () => void }) {
   const [f, setF] = useState({
@@ -22,6 +32,14 @@ export function BusinessDetailsTab({ profile, onSaved }: { profile: ClientProfil
     support_contact_phone: profile.support_contact_phone ?? '',
     description: profile.description ?? '',
   });
+  const [selectedSocials, setSelectedSocials] = useState<string[]>(
+    (profile.socials ?? []).map((s) => s.platform),
+  );
+  const [socialDetails, setSocialDetails] = useState<Record<string, SocialDetail>>(
+    Object.fromEntries(
+      (profile.socials ?? []).map((s) => [s.platform, { url: s.url ?? '', followers: s.followers != null ? String(s.followers) : '' }]),
+    ),
+  );
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
@@ -31,10 +49,25 @@ export function BusinessDetailsTab({ profile, onSaved }: { profile: ClientProfil
     setSaved(false);
   };
 
+  function toggleSocial(platform: string) {
+    setSaved(false);
+    setSelectedSocials((prev) => (prev.includes(platform) ? prev.filter((p) => p !== platform) : [...prev, platform]));
+    setSocialDetails((prev) => (prev[platform] ? prev : { ...prev, [platform]: { url: '', followers: '' } }));
+  }
+
+  function setSocialDetail(platform: string, patch: Partial<SocialDetail>) {
+    setSaved(false);
+    setSocialDetails((prev) => ({ ...prev, [platform]: { ...prev[platform], ...patch } }));
+  }
+
   async function save() {
     setBusy(true); setError(null); setSaved(false);
     try {
-      await api.patch<ClientProfile>('/v1/clients/me', f);
+      const socials: ClientSocial[] = SOCIALS.filter((s) => selectedSocials.includes(s.value)).map((s) => {
+        const d = socialDetails[s.value];
+        return { platform: s.value, url: d?.url || undefined, followers: d?.followers ? Number(d.followers) : undefined };
+      });
+      await api.patch<ClientProfile>('/v1/clients/me', { ...f, socials });
       setSaved(true);
       onSaved();
     } catch (e) {
@@ -112,6 +145,47 @@ export function BusinessDetailsTab({ profile, onSaved }: { profile: ClientProfil
           <Field label="Business description">
             <Textarea value={f.description} onChange={(e) => set({ description: e.target.value })} placeholder="A couple of sentences about what you do." />
           </Field>
+        </div>
+
+        <div className="mt-5">
+          <p className="mb-2 text-[13.5px] font-semibold text-ink">Your socials</p>
+          <div className="flex flex-wrap gap-2.5">
+            {SOCIALS.map((sc) => {
+              const on = selectedSocials.includes(sc.value);
+              return (
+                <button
+                  key={sc.value}
+                  type="button"
+                  aria-pressed={on}
+                  onClick={() => toggleSocial(sc.value)}
+                  className={`rounded-full px-5 py-2 text-[14px] font-semibold transition ${
+                    on ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+                  }`}
+                >
+                  {sc.label}
+                </button>
+              );
+            })}
+          </div>
+          {SOCIALS.filter((s) => selectedSocials.includes(s.value)).map((sc) => (
+            <div key={sc.value} className="mt-3">
+              <p className="mb-1.5 text-[12.5px] font-semibold text-muted">{sc.label}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input
+                  value={socialDetails[sc.value]?.url ?? ''}
+                  onChange={(e) => setSocialDetail(sc.value, { url: e.target.value })}
+                  placeholder="Link to channel"
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  value={socialDetails[sc.value]?.followers ?? ''}
+                  onChange={(e) => setSocialDetail(sc.value, { followers: e.target.value })}
+                  placeholder="Number of followers"
+                />
+              </div>
+            </div>
+          ))}
         </div>
 
         {error && <p className="mt-4 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] text-brand-700">{error}</p>}
