@@ -126,6 +126,9 @@ export type ClientProfile = {
   support_contact_name: string | null;
   support_contact_phone: string | null;
   description: string | null;
+  social_platform: string | null;
+  social_url: string | null;
+  social_followers: number | null;
   status: string;
 };
 
