@@ -33,7 +33,9 @@ function VerifyInner() {
     try {
       const tokens = await api.post<Tokens>('/v1/auth/otp/verify', { phone_e164: phone, code }, { auth: false });
       await setTokens(tokens);
-      router.replace('/dashboard');
+      // New business owners land on the optional "Set up your organisation" step;
+      // it is skippable straight through to the dashboard.
+      router.replace('/setup');
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'That code is not valid.');
       setSubmitting(false);
