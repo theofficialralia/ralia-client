@@ -166,6 +166,12 @@ export type CampaignPlan = {
   promoter_fee: Money;
   reach_per_slot: number;
   estimated_total_reach: number;
+  category: 'DISTRIBUTION' | 'CREATION';
+  floor_minor: Money;
+  min_slots: number;
+  meets_floor: boolean;
+  default_reach_per_slot: number;
+  default_promoters: number;
 };
 
 export type DashboardRow = {

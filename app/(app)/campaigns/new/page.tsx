@@ -333,13 +333,18 @@ function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDi
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // Seed the plan (and the budget) from the slot count the client came in with.
+  // Seed the plan (and the budget) from the slot count the client came in with,
+  // but never start below the category floor — bump up to the minimum that meets it.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
         const p = await api.post<CampaignPlan>(`/v1/campaigns/${campaignId}/plan`, { slots: initialSlots });
-        if (!cancelled) { setPlan(p); setBudget(p.total_price.amount_minor || p.unit_price.amount_minor); }
+        if (!cancelled) {
+          setPlan(p);
+          const floorBudget = p.min_slots * p.unit_price.amount_minor;
+          setBudget(Math.max(p.total_price.amount_minor || p.unit_price.amount_minor, floorBudget));
+        }
       } catch (e) { if (!cancelled) setErr(e instanceof ApiError ? e.message : 'Could not price the campaign.'); }
       finally { if (!cancelled) setLoading(false); }
     })();
@@ -367,13 +372,22 @@ function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDi
   }
 
   const unit = plan.unit_price.amount_minor;
-  const max = unit * MAX_SLIDER_SLOTS;
+  // The slider can't go below the category floor: its minimum is the fewest slots
+  // that meet the minimum campaign fee (₦15k Distribution / ₦100k Creation).
+  const minBudget = plan.min_slots * unit;
+  const max = Math.max(unit * MAX_SLIDER_SLOTS, minBudget);
+  const maxSlots = Math.floor(max / unit);
+  const categoryLabel = plan.category === 'CREATION' ? 'Creation/Participation' : 'Distribution';
   const locked = quote != null && quote.slots_total === plan.slots;
 
   return (
     <div>
       <Header title="Set your budget" subtitle="Slide to trade budget for reach. We price whole slots, so the total snaps to what your budget fully covers." />
       <div className="mt-2 space-y-5">
+        <div className="rounded-xl border border-rule bg-wash px-4 py-2.5 text-[12.5px] text-muted">
+          <span className="font-semibold text-ink">{categoryLabel}</span> campaign · minimum {plan.floor_minor.amount_display} ({plan.min_slots} slot{plan.min_slots === 1 ? '' : 's'})
+        </div>
+
         <div className="rounded-2xl border border-brand/20 bg-brand/[0.03] p-6 text-center">
           <p className="text-[13px] text-muted">Total campaign price</p>
           <p className="mt-1 text-[36px] font-extrabold tracking-tight text-ink">{plan.total_price.amount_display}</p>
@@ -382,12 +396,12 @@ function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDi
 
         <div>
           <input
-            type="range" min={unit} max={max} step={unit}
-            value={Math.min(Math.max(budget ?? unit, unit), max)}
+            type="range" min={minBudget} max={max} step={unit}
+            value={Math.min(Math.max(budget ?? minBudget, minBudget), max)}
             onChange={(e) => { if (quote) onDirty(); setBudget(Number(e.target.value)); }}
             className="w-full accent-brand"
           />
-          <div className="flex justify-between text-[11px] text-muted"><span>1 slot</span><span>{MAX_SLIDER_SLOTS} slots</span></div>
+          <div className="flex justify-between text-[11px] text-muted"><span>{plan.min_slots} slots (min)</span><span>{maxSlots} slots</span></div>
         </div>
 
         <div className="grid gap-3 sm:grid-cols-3">
@@ -401,8 +415,8 @@ function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDi
             ✓ Locked in at {quote!.price.amount_display} — continue to payment.
           </div>
         ) : (
-          <Button className="w-full" loading={committing} disabled={plan.slots < 1} onClick={() => onCommit(plan.slots)}>
-            {plan.slots < 1 ? 'Raise your budget to cover a slot' : `Lock in ${plan.slots} slots`}
+          <Button className="w-full" loading={committing} disabled={!plan.meets_floor} onClick={() => onCommit(plan.slots)}>
+            {!plan.meets_floor ? `Minimum is ${plan.floor_minor.amount_display}` : `Lock in ${plan.slots} slots`}
           </Button>
         )}
       </div>
