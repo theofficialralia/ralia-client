@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { api, ApiError, type ClientProfile } from '@/lib/api';
+import { api, ApiError, type ClientProfile, type ClientSocial } from '@/lib/api';
 import { useRequireAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/Button';
 import { Field, Input } from '@/components/ui/Field';
@@ -21,6 +21,8 @@ const SOCIALS = [
   { value: 'TIKTOK', label: 'TikTok' },
   { value: 'FACEBOOK', label: 'Facebook' },
 ];
+
+type SocialDetail = { url: string; followers: string };
 
 /**
  * Optional "Setup your organization" step shown right after OTP verification.
@@ -40,9 +42,9 @@ export default function SetupPage() {
 
   const [industry, setIndustry] = useState('');
   const [website, setWebsite] = useState('');
-  const [social, setSocial] = useState('WHATSAPP');
-  const [socialUrl, setSocialUrl] = useState('');
-  const [followers, setFollowers] = useState('');
+  // Multi-select: which platforms are on, plus a link + follower count for each.
+  const [selected, setSelected] = useState<string[]>([]);
+  const [details, setDetails] = useState<Record<string, SocialDetail>>({});
   const [seeded, setSeeded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,22 +55,44 @@ export default function SetupPage() {
       const p = profileQuery.data;
       setIndustry(p.industry ?? '');
       setWebsite(p.website ?? '');
-      setSocial(p.social_platform ?? 'WHATSAPP');
-      setSocialUrl(p.social_url ?? '');
-      setFollowers(p.social_followers != null ? String(p.social_followers) : '');
+      const socials = p.socials ?? [];
+      setSelected(socials.map((s) => s.platform));
+      setDetails(
+        Object.fromEntries(
+          socials.map((s) => [s.platform, { url: s.url ?? '', followers: s.followers != null ? String(s.followers) : '' }]),
+        ),
+      );
       setSeeded(true);
     }
   }, [profileQuery.data, seeded]);
 
+  function toggle(platform: string) {
+    setSelected((prev) =>
+      prev.includes(platform) ? prev.filter((p) => p !== platform) : [...prev, platform],
+    );
+    setDetails((prev) => (prev[platform] ? prev : { ...prev, [platform]: { url: '', followers: '' } }));
+  }
+
+  function setDetail(platform: string, patch: Partial<SocialDetail>) {
+    setDetails((prev) => ({ ...prev, [platform]: { ...prev[platform], ...patch } }));
+  }
+
   async function proceed() {
     setBusy(true); setError(null);
     try {
+      // One entry per selected platform, in the pill order, with optional link/followers.
+      const socials: ClientSocial[] = SOCIALS.filter((s) => selected.includes(s.value)).map((s) => {
+        const d = details[s.value];
+        return {
+          platform: s.value,
+          url: d?.url ? d.url : undefined,
+          followers: d?.followers ? Number(d.followers) : undefined,
+        };
+      });
       await api.patch<ClientProfile>('/v1/clients/me', {
         industry: industry || undefined,
         website: website || undefined,
-        social_platform: social,
-        social_url: socialUrl || undefined,
-        social_followers: followers ? Number(followers) : undefined,
+        socials,
       });
       router.replace('/dashboard');
     } catch (e) {
@@ -113,12 +137,13 @@ export default function SetupPage() {
           <p className="mb-2 text-[13.5px] font-semibold text-ink">Your socials</p>
           <div className="flex flex-wrap gap-2.5">
             {SOCIALS.map((sc) => {
-              const on = social === sc.value;
+              const on = selected.includes(sc.value);
               return (
                 <button
                   key={sc.value}
                   type="button"
-                  onClick={() => setSocial(sc.value)}
+                  aria-pressed={on}
+                  onClick={() => toggle(sc.value)}
                   className={`rounded-full px-5 py-2 text-[14px] font-semibold transition ${
                     on ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
                   }`}
@@ -128,16 +153,27 @@ export default function SetupPage() {
               );
             })}
           </div>
-          <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <Input value={socialUrl} onChange={(e) => setSocialUrl(e.target.value)} placeholder="Link to channel" />
-            <Input
-              type="number"
-              min={0}
-              value={followers}
-              onChange={(e) => setFollowers(e.target.value)}
-              placeholder="Number of followers"
-            />
-          </div>
+
+          {/* A link + follower count per selected platform, in pill order. */}
+          {SOCIALS.filter((s) => selected.includes(s.value)).map((sc) => (
+            <div key={sc.value} className="mt-3">
+              <p className="mb-1.5 text-[12.5px] font-semibold text-muted">{sc.label}</p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <Input
+                  value={details[sc.value]?.url ?? ''}
+                  onChange={(e) => setDetail(sc.value, { url: e.target.value })}
+                  placeholder="Link to channel"
+                />
+                <Input
+                  type="number"
+                  min={0}
+                  value={details[sc.value]?.followers ?? ''}
+                  onChange={(e) => setDetail(sc.value, { followers: e.target.value })}
+                  placeholder="Number of followers"
+                />
+              </div>
+            </div>
+          ))}
         </div>
 
         {error && (

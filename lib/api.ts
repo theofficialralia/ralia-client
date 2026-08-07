@@ -126,11 +126,11 @@ export type ClientProfile = {
   support_contact_name: string | null;
   support_contact_phone: string | null;
   description: string | null;
-  social_platform: string | null;
-  social_url: string | null;
-  social_followers: number | null;
+  socials: ClientSocial[] | null;
   status: string;
 };
+
+export type ClientSocial = { platform: string; url?: string | null; followers?: number | null };
 
 export type CampaignStatus =
   | 'DRAFT' | 'QUOTED' | 'PENDING_APPROVAL' | 'REJECTED' | 'CONFIRMING_PAYMENT'
