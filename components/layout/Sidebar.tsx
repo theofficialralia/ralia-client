@@ -2,7 +2,9 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import { Logo } from '@/components/brand/Logo';
+import { api, type ClientProfile } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
 const nav = [
@@ -10,9 +12,33 @@ const nav = [
   { href: '/campaigns', label: 'My Campaigns', icon: MegaphoneIcon },
 ];
 
+/**
+ * Profile completeness — the share of the optional business-profile fields that
+ * are filled. Drives the sidebar nudge; hidden once everything is in.
+ */
+function profileCompleteness(p: ClientProfile): number {
+  const checks = [
+    !!p.industry,
+    !!p.website,
+    !!p.phone_whatsapp,
+    !!p.address,
+    !!p.cac_number,
+    !!(p.support_contact_name || p.support_contact_phone),
+    !!p.description,
+    !!(p.socials && p.socials.length > 0),
+  ];
+  return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+}
+
 export function Sidebar() {
   const pathname = usePathname();
   const { user, logout } = useAuth();
+  // Shares the ['client-profile'] cache with Settings, so it's deduped.
+  const profile = useQuery({
+    queryKey: ['client-profile'],
+    queryFn: () => api.get<ClientProfile>('/v1/clients/me'),
+  });
+  const pct = profile.data ? profileCompleteness(profile.data) : null;
 
   return (
     <aside className="flex w-[260px] shrink-0 flex-col border-r border-rule bg-sidebar text-white">
@@ -20,15 +46,20 @@ export function Sidebar() {
         <Logo label="Businesses" className="[&_div]:text-white [&_.text-muted]:text-white/50" />
       </div>
 
-      <div className="mx-4 mb-4 rounded-2xl border border-white/10 bg-white/[0.04] p-4">
-        <div className="flex items-center gap-2">
-          <span className="grid h-6 w-6 place-items-center rounded-full border-2 border-warn text-[11px] font-bold text-warn">
-            !
-          </span>
-          <span className="text-[15px] font-bold">50%</span>
-        </div>
-        <p className="mt-2 text-[12.5px] leading-snug text-white/55">Complete your profile to create campaigns</p>
-      </div>
+      {pct !== null && pct < 100 && (
+        <Link
+          href="/settings"
+          className="mx-4 mb-4 block rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition hover:bg-white/[0.07]"
+        >
+          <div className="flex items-center gap-2">
+            <span className="grid h-6 w-6 place-items-center rounded-full border-2 border-warn text-[11px] font-bold text-warn">
+              !
+            </span>
+            <span className="text-[15px] font-bold">{pct}%</span>
+          </div>
+          <p className="mt-2 text-[12.5px] leading-snug text-white/55">Complete your profile to get better matches</p>
+        </Link>
+      )}
 
       <nav className="flex-1 space-y-1 px-3">
         {nav.map((item) => {
