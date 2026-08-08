@@ -15,12 +15,12 @@ export function Stepper({ current }: { current: number }) {
                   done || active ? 'bg-brand text-white' : 'border border-rule bg-paper text-muted'
                 }`}
               >
-                {done ? '✓' : n}
+                {n}
               </span>
-              <span className={`text-[14px] font-semibold ${active ? 'text-ink' : 'text-muted'}`}>{label}</span>
+              <span className={`text-[14px] font-semibold ${done || active ? 'text-ink' : 'text-muted'}`}>{label}</span>
             </div>
             {n < STEPS.length && (
-              <div className="mx-3 h-px flex-1 border-t-2 border-dashed border-rule" />
+              <div className={`mx-3 h-px flex-1 border-t-2 border-dashed ${done ? 'border-brand/50' : 'border-rule'}`} />
             )}
           </div>
         );

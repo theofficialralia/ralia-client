@@ -1,28 +1,86 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { api, ApiError, uuid, type Campaign, type CampaignPlan, type Quote } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { CATEGORIES, LANGUAGES, OBJECTIVES, PLATFORMS, ROLES, STATES } from '@/lib/campaign-options';
 import { loadPaystack, PAYSTACK_PUBLIC_KEY, paystackConfigured } from '@/lib/paystack';
 import { Button } from '@/components/ui/Button';
-import { Field, Input, Select, Textarea } from '@/components/ui/Field';
-import { ChipSelect } from '@/components/ui/ChipSelect';
+import { Field, Input, Textarea } from '@/components/ui/Field';
 import { Stepper } from '@/components/campaigns/wizard/Stepper';
 
+// ── Design option sets (labels map to backend values) ─────────
+
+// Design shows four objectives; they map onto the API's objective enum.
+const OBJECTIVE_PILLS = [
+  { value: 'AWARENESS', label: 'Visibility' },
+  { value: 'PURCHASE', label: 'Sales' },
+  { value: 'WEBSITE_VISIT', label: 'Engagement' },
+  { value: 'LEAD_GEN', label: 'Lead Generation' },
+];
+
+const LOCATIONS = [
+  { label: 'Lagos', states: ['Lagos'] },
+  { label: 'Abuja', states: ['FCT'] },
+  { label: 'Port Harcourt', states: ['Rivers'] },
+  { label: 'Ibadan', states: ['Oyo'] },
+  { label: 'Nationwide', states: [] as string[] },
+];
+
+const AGE_BUCKETS = [
+  { label: '18-30', min: 18, max: 30 },
+  { label: '31-40', min: 31, max: 40 },
+  { label: '41-50', min: 41, max: 50 },
+  { label: '51-60+', min: 51, max: 100 },
+  { label: 'All ages', min: null, max: null },
+];
+
+const GENDERS = [
+  { label: 'Women', value: ['FEMALE'] },
+  { label: 'Men', value: ['MALE'] },
+  { label: 'Both', value: [] as string[] },
+];
+
+const LANGUAGES = ['English', 'Yoruba', 'Igbo', 'Hausa', 'Pidgin'];
+
+const CATEGORIES = [
+  'Technology & Digital Products', 'Financial Services & Fintech', 'Consumer Goods & Retail (FMCG)',
+  'Lifestyle & Personal Care', 'Health & Pharmaceuticals', 'Entertainment, Media & Gaming',
+  'Real Estate & Construction', 'Travel', 'Hospitality & Leisure', 'Education & Career Services',
+  'Mobility', 'Logistics & Utilities', 'Other / General',
+];
+
+const PLATFORMS = [
+  { label: 'WhatsApp', value: 'WHATSAPP_STATUS' },
+  { label: 'Instagram', value: 'INSTAGRAM' },
+  { label: 'X', value: 'X' },
+  { label: 'TikTok', value: 'TIKTOK' },
+  { label: 'Facebook', value: 'FACEBOOK' },
+];
+
+const ROLE_CARDS = [
+  { value: 'DISTRIBUTOR', title: 'Share it as-is', tag: 'best for visibility', body: 'They post your content on their socials exactly as provided — nothing extra.' },
+  { value: 'CREATOR', title: 'Create something new', body: 'They build original content about your product from your brief and assets.' },
+  { value: 'PARTICIPATOR', title: 'Do a set task', body: 'They complete a specific task you assign e.g. store visits, flyers, surveys, reviews.' },
+  { value: 'INFLUENCER', title: 'Reach a bigger audience', body: 'We hand-match you with a high-profile creator for a collab post.' },
+];
+
 type State = {
-  name: string; objective: string; description: string; instructions: string; destination_url: string; slots_total: number;
+  name: string; objective: string; description: string; destination_url: string;
   imageFile: File | null; caption: string;
-  states: string[]; age_min: string; age_max: string; languages: string[]; categories: string[];
-  platforms: string[]; min_effective_reach: string; roles: string[];
+  location: string; ageBucket: string; gender: string; language: string;
+  categories: string[]; platform: string; role: string;
 };
 
 const initial: State = {
-  name: '', objective: 'AWARENESS', description: '', instructions: '', destination_url: '', slots_total: 5,
+  name: '', objective: 'AWARENESS', description: '', destination_url: '',
   imageFile: null, caption: '',
-  states: [], age_min: '', age_max: '', languages: [], categories: [], platforms: [], min_effective_reach: '', roles: [],
+  location: '', ageBucket: '', gender: '', language: '', categories: [], platform: '', role: '',
 };
+
+// A placeholder slot count for the brief create — the real count is set at the
+// Quote step (commitPlan), driven by budget and the category floor.
+const PLACEHOLDER_SLOTS = 5;
 
 export default function NewCampaignPage() {
   const router = useRouter();
@@ -36,26 +94,23 @@ export default function NewCampaignPage() {
 
   const set = (patch: Partial<State>) => setS((prev) => ({ ...prev, ...patch }));
 
-  // ── Step actions ─────────────────────────────────────────
-
   async function saveBrief() {
     if (!s.name.trim()) return setError('Give your campaign a name.');
-    if (!/^https?:\/\//.test(s.destination_url)) return setError('Enter a valid destination URL (https://…).');
+    if (!/^https?:\/\//.test(s.destination_url)) return setError('Enter a valid destination link (https://…).');
     setBusy(true); setError(null);
     try {
       const body = {
         name: s.name.trim(),
         objective: s.objective,
         description: s.description || undefined,
-        promoter_instructions: s.instructions || undefined,
         destination_url: s.destination_url,
-        slots_total: Number(s.slots_total),
+        slots_total: PLACEHOLDER_SLOTS,
       };
       const campaign = campaignId
         ? await api.patch<Campaign>(`/v1/campaigns/${campaignId}`, body)
         : await api.post<Campaign>('/v1/campaigns', body);
       setCampaignId(campaign.id);
-      setQuote(null); // any brief change invalidates a prior quote
+      setQuote(null);
       setStep(2);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not save.');
@@ -90,20 +145,22 @@ export default function NewCampaignPage() {
 
   async function saveTargeting() {
     if (!campaignId) return;
-    if (!s.min_effective_reach || Number(s.min_effective_reach) <= 0) {
-      return setError('Set a minimum effective reach — it is what each slot is priced on.');
-    }
+    if (!s.role) return setError('Choose who should promote this.');
     setBusy(true); setError(null);
     try {
+      const loc = LOCATIONS.find((l) => l.label === s.location);
+      const age = AGE_BUCKETS.find((a) => a.label === s.ageBucket);
+      const gender = GENDERS.find((g) => g.label === s.gender);
       await api.put(`/v1/campaigns/${campaignId}/targeting`, {
-        states: s.states,
-        age_min: s.age_min ? Number(s.age_min) : undefined,
-        age_max: s.age_max ? Number(s.age_max) : undefined,
-        languages: s.languages,
+        states: loc?.states ?? [],
+        age_min: age?.min ?? undefined,
+        age_max: age?.max ?? undefined,
+        genders: gender?.value ?? [],
+        languages: s.language ? [s.language] : [],
         categories: s.categories,
-        platforms: s.platforms,
-        min_effective_reach: Number(s.min_effective_reach),
-        roles: s.roles,
+        platforms: s.platform ? [s.platform] : [],
+        roles: [s.role],
+        // Reach per slot comes from the role's category default — no manual input.
       });
       setQuote(null);
       setStep(4);
@@ -114,14 +171,12 @@ export default function NewCampaignPage() {
     }
   }
 
-  // Lock in the plan the slider settled on: save the slot count, then freeze the
-  // price with a real quote. This is what enables "Continue to payment".
+  // Lock in the plan the slider settled on: save the slot count, then freeze the price.
   async function commitPlan(slots: number) {
     if (!campaignId) return;
     setBusy(true); setError(null);
     try {
       await api.patch(`/v1/campaigns/${campaignId}`, { slots_total: slots });
-      set({ slots_total: slots });
       const q = await api.post<Quote>(`/v1/campaigns/${campaignId}/quote`);
       setQuote(q);
     } catch (e) {
@@ -142,7 +197,7 @@ export default function NewCampaignPage() {
       const handler = paystack.setup({
         key: PAYSTACK_PUBLIC_KEY,
         email: user.email,
-        amount: quote.price.amount_minor, // already kobo
+        amount: quote.price.amount_minor,
         currency: 'NGN',
         ref: `RLA-${campaignId.slice(0, 8)}-${uuid().slice(0, 8)}`,
         metadata: { campaign_id: campaignId },
@@ -159,11 +214,7 @@ export default function NewCampaignPage() {
     if (!campaignId) return;
     setBusy(true); setError(null);
     try {
-      // The backend verifies the reference with Paystack (secret key) and only
-      // then credits the campaign escrow and moves it LIVE.
-      await api.post(`/v1/campaigns/${campaignId}/payments/paystack/verify`, { reference }, {
-        idempotencyKey: uuid(),
-      });
+      await api.post(`/v1/campaigns/${campaignId}/payments/paystack/verify`, { reference }, { idempotencyKey: uuid() });
       router.replace(`/campaigns/${campaignId}?funded=1`);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'We could not confirm the payment. If you were charged, contact support.');
@@ -171,49 +222,36 @@ export default function NewCampaignPage() {
     }
   }
 
-  const canContinue = useMemo(() => {
-    if (step === 1) return s.name.trim() && s.destination_url;
-    if (step === 3) return !!s.min_effective_reach;
-    return true;
-  }, [step, s]);
-
   return (
-    <div className="mx-auto max-w-3xl">
+    <div className="mx-auto max-w-4xl">
       <div className="flex items-center justify-between">
-        <button onClick={() => router.push('/campaigns')} className="text-[14px] font-semibold text-muted hover:text-ink">
-          ← Cancel &amp; return
+        <button onClick={() => router.push('/campaigns')} className="flex items-center gap-2 text-[15px] font-semibold text-muted hover:text-ink">
+          ← Cancel &amp; Return
         </button>
         <span className="text-[13px] text-muted">Step {step} of 5</span>
       </div>
 
       <div className="mt-5"><Stepper current={step} /></div>
 
-      <div className="card mt-6 p-6 sm:p-8">
+      <div className="mt-6">
         {step === 1 && <Brief s={s} set={set} />}
         {step === 2 && <Assets s={s} set={set} />}
         {step === 3 && <Targeting s={s} set={set} />}
-        {step === 4 && campaignId && <QuoteStep campaignId={campaignId} initialSlots={Number(s.slots_total)} quote={quote} committing={busy} onCommit={commitPlan} onDirty={() => setQuote(null)} />}
+        {step === 4 && campaignId && <QuoteStep campaignId={campaignId} initialSlots={PLACEHOLDER_SLOTS} quote={quote} committing={busy} onCommit={commitPlan} onDirty={() => setQuote(null)} />}
         {step === 5 && <Fund quote={quote} />}
 
         {error && (
-          <div className="mt-5 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] text-brand-700">
-            {error}
-          </div>
+          <div className="mt-5 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] text-brand-700">{error}</div>
         )}
 
         <div className="mt-7 flex items-center justify-between">
-          <Button
-            variant="secondary"
-            onClick={() => (step === 1 ? router.push('/campaigns') : setStep((n) => n - 1))}
-            disabled={busy}
-          >
+          <Button variant="secondary" onClick={() => (step === 1 ? router.push('/campaigns') : setStep((n) => n - 1))} disabled={busy}>
             ← Back
           </Button>
-
-          {step === 1 && <Button onClick={saveBrief} loading={busy} disabled={!canContinue}>Continue →</Button>}
-          {step === 2 && <Button onClick={saveAssets} loading={busy}>Continue →</Button>}
-          {step === 3 && <Button onClick={saveTargeting} loading={busy} disabled={!canContinue}>Get quote →</Button>}
-          {step === 4 && <Button onClick={() => setStep(5)} disabled={!quote || busy}>Continue to payment →</Button>}
+          {step === 1 && <Button onClick={saveBrief} loading={busy}>Proceed →</Button>}
+          {step === 2 && <Button onClick={saveAssets} loading={busy}>Proceed →</Button>}
+          {step === 3 && <Button onClick={saveTargeting} loading={busy}>Proceed →</Button>}
+          {step === 4 && <Button onClick={() => setStep(5)} disabled={!quote || busy}>Proceed →</Button>}
           {step === 5 && <Button onClick={pay} loading={busy}>Pay with Paystack</Button>}
         </div>
       </div>
@@ -225,30 +263,28 @@ export default function NewCampaignPage() {
 
 function Brief({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
   return (
-    <div className="space-y-5">
-      <Header title="Tell us about your campaign" subtitle="The basics promoters will see." />
+    <div className="space-y-6">
+      <Header title="Write the brief." subtitle="Promoters will see this. Keep it clear — what to say, do and why it matters." />
       <Field label="Campaign name">
-        <Input value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="Harmattan Drop" />
+        <Input value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="Lagos launch — Skinsmith serum" />
       </Field>
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Objective">
-          <Select value={s.objective} onChange={(e) => set({ objective: e.target.value })}>
-            {OBJECTIVES.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-          </Select>
-        </Field>
-        <Field label="Number of slots" hint="How many promoters you want.">
-          <Input type="number" min={1} max={500} value={s.slots_total}
-            onChange={(e) => set({ slots_total: Number(e.target.value) })} />
-        </Field>
+
+      <div>
+        <p className="mb-2 text-[14px] font-semibold text-ink">Objective</p>
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+          {OBJECTIVE_PILLS.map((o) => (
+            <SelectCard key={o.value} on={s.objective === o.value} onClick={() => set({ objective: o.value })}>
+              {o.label}
+            </SelectCard>
+          ))}
+        </div>
       </div>
-      <Field label="Destination URL">
-        <Input value={s.destination_url} onChange={(e) => set({ destination_url: e.target.value })} placeholder="https://yourbrand.com/shop" />
+
+      <Field label="Description">
+        <Textarea value={s.description} onChange={(e) => set({ description: e.target.value })} placeholder="What is this campaign about, and who is it for?" />
       </Field>
-      <Field label="Description" hint="Optional.">
-        <Textarea value={s.description} onChange={(e) => set({ description: e.target.value })} placeholder="What is this campaign about?" />
-      </Field>
-      <Field label="Instructions for promoters" hint="Optional.">
-        <Textarea value={s.instructions} onChange={(e) => set({ instructions: e.target.value })} placeholder="Post the image to your status and leave it up 24h." />
+      <Field label="Destination Link">
+        <Input value={s.destination_url} onChange={(e) => set({ destination_url: e.target.value })} placeholder="https://" />
       </Field>
     </div>
   );
@@ -260,12 +296,7 @@ function Assets({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
       <Header title="Add your creative" subtitle="What promoters will post. You can skip and add these later." />
       <Field label="Campaign image" hint="JPEG, PNG or WebP, up to 10 MB.">
         <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-rule bg-wash py-10 text-center transition hover:border-brand/40">
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            className="hidden"
-            onChange={(e) => set({ imageFile: e.target.files?.[0] ?? null })}
-          />
+          <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => set({ imageFile: e.target.files?.[0] ?? null })} />
           {s.imageFile ? (
             <span className="text-[14px] font-semibold text-ink">{s.imageFile.name}</span>
           ) : (
@@ -284,57 +315,87 @@ function Assets({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
 }
 
 function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
+  const toggleCategory = (c: string) =>
+    set({ categories: s.categories.includes(c) ? s.categories.filter((x) => x !== c) : [...s.categories, c] });
+
   return (
-    <div className="space-y-6">
-      <Header title="Who should see it" subtitle="Each filter you add sharpens the match — and nudges the price." />
-      <Field label="Minimum effective reach per promoter" hint="Each slot is priced on this. Required.">
-        <Input type="number" min={0} value={s.min_effective_reach}
-          onChange={(e) => set({ min_effective_reach: e.target.value })} placeholder="1000" />
-      </Field>
-      <Field label="Platforms">
-        <ChipSelect options={PLATFORMS} value={s.platforms} onChange={(v) => set({ platforms: v })} />
-      </Field>
-      <Field label="Promoter roles">
-        <ChipSelect options={ROLES} value={s.roles} onChange={(v) => set({ roles: v })} />
-      </Field>
-      <div className="grid gap-5 sm:grid-cols-2">
-        <Field label="Minimum age">
-          <Input type="number" min={13} max={100} value={s.age_min} onChange={(e) => set({ age_min: e.target.value })} placeholder="18" />
-        </Field>
-        <Field label="Maximum age">
-          <Input type="number" min={13} max={100} value={s.age_max} onChange={(e) => set({ age_max: e.target.value })} placeholder="45" />
-        </Field>
+    <div className="space-y-7">
+      <div className="flex items-start justify-between gap-4">
+        <Header title="Target the right people." subtitle="The quote on the next screen moves live with every choice you make." />
+        <span className="hidden shrink-0 rounded-full border border-rule px-4 py-2 text-[13px] font-semibold text-brand-700 sm:inline-flex">
+          📞 Need help? Talk to us
+        </span>
       </div>
-      <Field label="Categories">
-        <ChipSelect options={CATEGORIES} value={s.categories} onChange={(v) => set({ categories: v })} />
-      </Field>
-      <Field label="Languages">
-        <ChipSelect options={LANGUAGES} value={s.languages} onChange={(v) => set({ languages: v })} />
-      </Field>
-      <Field label="States">
-        <ChipSelect options={STATES} value={s.states} onChange={(v) => set({ states: v })} scroll />
-      </Field>
+
+      <PillGroup label="Location" options={LOCATIONS.map((l) => l.label)} value={s.location} onSelect={(v) => set({ location: v })} />
+      <PillGroup label="Age range" options={AGE_BUCKETS.map((a) => a.label)} value={s.ageBucket} onSelect={(v) => set({ ageBucket: v })} />
+      <PillGroup label="Gender" options={GENDERS.map((g) => g.label)} value={s.gender} onSelect={(v) => set({ gender: v })} />
+      <PillGroup label="Language" options={LANGUAGES} value={s.language} onSelect={(v) => set({ language: v })} />
+
+      <div>
+        <p className="mb-2 text-[15px] font-semibold text-ink">Category of interest</p>
+        <div className="flex flex-wrap gap-2.5">
+          {CATEGORIES.map((c) => {
+            const on = s.categories.includes(c);
+            return (
+              <button
+                key={c}
+                type="button"
+                onClick={() => toggleCategory(c)}
+                className={`rounded-full px-4 py-2 text-[13.5px] font-semibold transition ${
+                  on ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+                }`}
+              >
+                {on ? '× ' : ''}{c}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <PillGroup label="Platform" options={PLATFORMS.map((p) => p.label)} value={PLATFORMS.find((p) => p.value === s.platform)?.label ?? ''}
+        onSelect={(label) => set({ platform: PLATFORMS.find((p) => p.label === label)?.value ?? '' })} />
+
+      <div>
+        <p className="text-[15px] font-semibold text-ink">Who should promote this?</p>
+        <p className="mt-0.5 text-[13.5px] text-muted">Tell us what you need — we&apos;ll match the right kind of promoter automatically. No jargon required.</p>
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {ROLE_CARDS.map((r) => {
+            const on = s.role === r.value;
+            return (
+              <button
+                key={r.value}
+                type="button"
+                onClick={() => set({ role: r.value })}
+                className={`rounded-2xl border p-5 text-left transition ${
+                  on ? 'border-ink bg-ink text-white' : 'border-rule bg-paper hover:border-ink/30'
+                }`}
+              >
+                <div className="text-[16px] font-bold">
+                  {r.title}{r.tag ? <span className={on ? 'text-white/70' : 'text-muted'}> ({r.tag})</span> : ''}
+                </div>
+                <p className={`mt-1.5 text-[13px] leading-snug ${on ? 'text-white/70' : 'text-muted'}`}>{r.body}</p>
+              </button>
+            );
+          })}
+        </div>
+      </div>
     </div>
   );
 }
 
-const MAX_SLIDER_SLOTS = 60;
+const MAX_BUDGET_MINOR = 500_000_000; // ₦5,000,000
 
 function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDirty }: {
-  campaignId: string;
-  initialSlots: number;
-  quote: Quote | null;
-  committing: boolean;
-  onCommit: (slots: number) => void;
-  onDirty: () => void;
+  campaignId: string; initialSlots: number; quote: Quote | null; committing: boolean;
+  onCommit: (slots: number) => void; onDirty: () => void;
 }) {
   const [plan, setPlan] = useState<CampaignPlan | null>(null);
-  const [budget, setBudget] = useState<number | null>(null); // kobo
+  const [budget, setBudget] = useState<number | null>(null);
+  const [custom, setCustom] = useState('');
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // Seed the plan (and the budget) from the slot count the client came in with,
-  // but never start below the category floor — bump up to the minimum that meets it.
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -351,8 +412,6 @@ function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDi
     return () => { cancelled = true; };
   }, [campaignId, initialSlots]);
 
-  // Re-price against the server as the slider settles (debounced) — the endpoint is
-  // the source of truth, so the total always snaps to whole slots the budget covers.
   useEffect(() => {
     if (budget == null) return;
     const t = setTimeout(async () => {
@@ -365,54 +424,72 @@ function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDi
   if (loading || !plan) {
     return (
       <div>
-        <Header title="Set your budget" subtitle="Trade budget for reach." />
+        <Header title="Your live quote." subtitle="Change any filter and this number moves. This is the honest one." />
         <div className="py-10 text-center text-muted">{err ?? 'Pricing your campaign…'}</div>
       </div>
     );
   }
 
   const unit = plan.unit_price.amount_minor;
-  // The slider can't go below the category floor: its minimum is the fewest slots
-  // that meet the minimum campaign fee (₦15k Distribution / ₦100k Creation).
   const minBudget = plan.min_slots * unit;
-  const max = Math.max(unit * MAX_SLIDER_SLOTS, minBudget);
-  const maxSlots = Math.floor(max / unit);
-  const categoryLabel = plan.category === 'CREATION' ? 'Creation/Participation' : 'Distribution';
+  const max = Math.max(MAX_BUDGET_MINOR, minBudget);
+  const value = Math.min(Math.max(budget ?? minBudget, minBudget), max);
   const locked = quote != null && quote.slots_total === plan.slots;
+
+  function applyCustom() {
+    const naira = Number(custom.replace(/[^0-9]/g, ''));
+    if (!naira) return;
+    if (quote) onDirty();
+    setBudget(Math.min(Math.max(naira * 100, minBudget), max));
+  }
 
   return (
     <div>
-      <Header title="Set your budget" subtitle="Slide to trade budget for reach. We price whole slots, so the total snaps to what your budget fully covers." />
-      <div className="mt-2 space-y-5">
-        <div className="rounded-xl border border-rule bg-wash px-4 py-2.5 text-[12.5px] text-muted">
-          <span className="font-semibold text-ink">{categoryLabel}</span> campaign · minimum {plan.floor_minor.amount_display} ({plan.min_slots} slot{plan.min_slots === 1 ? '' : 's'})
+      <Header title="Your live quote." subtitle="Change any filter and this number moves. This is the honest one." />
+
+      <div className="mt-3 rounded-3xl border border-rule bg-paper p-6 sm:p-8">
+        <p className="text-[14px] text-muted">Estimated price</p>
+        <p className="mt-1 text-[44px] font-extrabold leading-none tracking-tight text-brand">{plan.total_price.amount_display}</p>
+
+        <input
+          type="range" min={minBudget} max={max} step={unit}
+          value={value}
+          onChange={(e) => { if (quote) onDirty(); setBudget(Number(e.target.value)); }}
+          className="mt-5 w-full accent-brand"
+        />
+        <div className="flex justify-between text-[12px] text-muted">
+          <span>{plan.floor_minor.amount_display}</span><span>₦5M</span>
         </div>
 
-        <div className="rounded-2xl border border-brand/20 bg-brand/[0.03] p-6 text-center">
-          <p className="text-[13px] text-muted">Total campaign price</p>
-          <p className="mt-1 text-[36px] font-extrabold tracking-tight text-ink">{plan.total_price.amount_display}</p>
-          <p className="mt-1 text-[13px] text-muted">{plan.unit_price.amount_display} per slot × {plan.slots} slots</p>
+        <div className="mt-5">
+          <p className="mb-1.5 text-[14px] font-semibold text-ink">Custom price</p>
+          <div className="flex gap-2">
+            <Input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="e.g ₦50,000" />
+            <Button variant="secondary" onClick={applyCustom}>Set</Button>
+          </div>
         </div>
 
-        <div>
-          <input
-            type="range" min={minBudget} max={max} step={unit}
-            value={Math.min(Math.max(budget ?? minBudget, minBudget), max)}
-            onChange={(e) => { if (quote) onDirty(); setBudget(Number(e.target.value)); }}
-            className="w-full accent-brand"
-          />
-          <div className="flex justify-between text-[11px] text-muted"><span>{plan.min_slots} slots (min)</span><span>{maxSlots} slots</span></div>
+        <div className="mt-6 grid grid-cols-2 gap-4 border-t border-rule pt-6">
+          <div>
+            <p className="text-[13px] text-muted">Promoters we&apos;ll offer to</p>
+            <p className="mt-1 text-[26px] font-extrabold tracking-tight text-ink">{plan.slots.toLocaleString('en-NG')}</p>
+          </div>
+          <div>
+            <p className="text-[13px] text-muted">Estimated reach</p>
+            <p className="mt-1 text-[26px] font-extrabold tracking-tight text-ink">{plan.estimated_total_reach.toLocaleString('en-NG')}+</p>
+            <p className="text-[12px] text-muted">real, verified views</p>
+          </div>
         </div>
+      </div>
 
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Mini label="Slots (promoters)" value={plan.slots.toLocaleString('en-NG')} />
-          <Mini label="Est. total reach" value={plan.estimated_total_reach.toLocaleString('en-NG')} />
-          <Mini label="Each promoter earns" value={plan.promoter_fee.amount_display} />
-        </div>
+      <div className="mt-4 rounded-2xl border border-rule bg-wash px-4 py-3 text-[13px] text-muted">
+        ⓘ If we don&apos;t fill every slot, the unspent balance is refunded to your wallet, itemised. You&apos;ll always know exactly what your money bought.
+      </div>
 
+      <div className="mt-5">
         {locked ? (
           <div className="rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] font-semibold text-brand-700">
-            ✓ Locked in at {quote!.price.amount_display} — continue to payment.
+            ✓ Locked in at {quote!.price.amount_display} — proceed to payment.
           </div>
         ) : (
           <Button className="w-full" loading={committing} disabled={!plan.meets_floor} onClick={() => onCommit(plan.slots)}>
@@ -428,13 +505,12 @@ function Fund({ quote }: { quote: Quote | null }) {
   return (
     <div>
       <Header title="Fund the campaign" subtitle="Pay securely with Paystack. Your campaign goes live the moment payment clears." />
-      <div className="mt-2 rounded-2xl border border-rule p-6">
+      <div className="mt-3 rounded-2xl border border-rule p-6">
         <div className="flex items-baseline justify-between">
           <span className="text-[14px] text-muted">Amount to pay</span>
           <span className="text-[28px] font-extrabold tracking-tight text-brand">{quote?.price.amount_display ?? '—'}</span>
         </div>
         <div className="mt-5 flex items-center gap-3 rounded-xl bg-wash px-4 py-3 text-[13px] text-muted">
-          <PaystackGlyph />
           Card details are entered in Paystack&apos;s secure window — Ralia never sees your card number.
         </div>
       </div>
@@ -447,25 +523,44 @@ function Fund({ quote }: { quote: Quote | null }) {
 function Header({ title, subtitle }: { title: string; subtitle: string }) {
   return (
     <div>
-      <h2 className="text-[22px] font-extrabold tracking-tight text-ink">{title}</h2>
-      <p className="mt-1 text-[14px] text-muted">{subtitle}</p>
+      <h2 className="text-[24px] font-extrabold tracking-tight text-ink">{title}</h2>
+      <p className="mt-1 text-[14.5px] text-muted">{subtitle}</p>
     </div>
   );
 }
 
-function Mini({ label, value }: { label: string; value: string }) {
+function PillGroup({ label, options, value, onSelect }: { label: string; options: string[]; value: string; onSelect: (v: string) => void }) {
   return (
-    <div className="rounded-xl border border-rule bg-paper p-4 text-center">
-      <p className="text-[12px] text-muted">{label}</p>
-      <p className="mt-1 text-[17px] font-bold text-ink">{value}</p>
+    <div>
+      <p className="mb-2 text-[15px] font-semibold text-ink">{label}</p>
+      <div className="flex flex-wrap gap-2.5">
+        {options.map((o) => (
+          <button
+            key={o}
+            type="button"
+            onClick={() => onSelect(o === value ? '' : o)}
+            className={`rounded-full px-5 py-2 text-[14px] font-semibold transition ${
+              value === o ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+            }`}
+          >
+            {o}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
 
-function PaystackGlyph() {
+function SelectCard({ on, onClick, children }: { on: boolean; onClick: () => void; children: React.ReactNode }) {
   return (
-    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8">
-      <rect x="2" y="5" width="20" height="14" rx="2" /><path d="M2 10h20" />
-    </svg>
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-2xl px-4 py-3.5 text-[14px] font-semibold transition ${
+        on ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+      }`}
+    >
+      {children}
+    </button>
   );
 }
