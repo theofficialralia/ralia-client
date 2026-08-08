@@ -65,17 +65,40 @@ const ROLE_CARDS = [
   { value: 'INFLUENCER', title: 'Reach a bigger audience', body: 'We hand-match you with a high-profile creator for a collab post.' },
 ];
 
+// Per-role task config (revealed under the role cards).
+const CONTENT_TYPES = ['Review / Testimonial / Feedback', 'Educate (How to)', 'Invitation', 'Skit/Comedy', 'Other user generated content'];
+const TASK_TYPES_ONLINE = [
+  'Signups/App install/Downloads/Website Traffic/Page Visits',
+  'Online Market Research/Survey/Product Review/Rating/Beta Testing/Feedback',
+  'Social Page Follow/Engagement',
+  'Other Tasks',
+];
+const TASK_TYPES_OFFLINE = [
+  'Physical market research/Field Survey/Observation/Product Review',
+  'Share campaign where people can see it e.g Flyer/Handbill/Poster/Mega Billboards/Churches etc',
+  'Event Attendance/Physical Crowd/Volunteer',
+  'Mystery Shopping/Store Audit/Store Walk-ins',
+  'Other Tasks',
+];
+const BUDGET_BUCKETS = ['Under ₦1M', '₦1M – ₦2M', '₦2M – ₦3M', '₦3M – ₦5M', '₦5M+'];
+const FOLLOWING_SIZES = ['10k – 50k (micro)', '50k – 100k', '100k – 500k', '500k – 1M', '1M+ (celebrity)'];
+const AUDIENCE_REACH = ['10k – 50k', '50k – 100k', '100k – 500k', '500k – 1M', '1M+'];
+
 type State = {
   name: string; objective: string; description: string; destination_url: string;
   imageFile: File | null; caption: string;
   location: string; ageBucket: string; gender: string; language: string;
   categories: string[]; platform: string; role: string;
+  // Per-role task config
+  contentType: string; taskMode: '' | 'ONLINE' | 'OFFLINE'; taskTypes: string[];
+  budgetBucket: string; followingSize: string; audienceReach: string;
 };
 
 const initial: State = {
   name: '', objective: 'AWARENESS', description: '', destination_url: '',
   imageFile: null, caption: '',
   location: '', ageBucket: '', gender: '', language: '', categories: [], platform: '', role: '',
+  contentType: '', taskMode: '', taskTypes: [], budgetBucket: '', followingSize: '', audienceReach: '',
 };
 
 // A placeholder slot count for the brief create — the real count is set at the
@@ -161,6 +184,18 @@ export default function NewCampaignPage() {
         platforms: s.platform ? [s.platform] : [],
         roles: [s.role],
         // Reach per slot comes from the role's category default — no manual input.
+      });
+      // Persist the per-role task detail (only the fields that apply to this role).
+      const offline = s.role === 'PARTICIPATOR' && s.taskMode === 'OFFLINE';
+      await api.patch(`/v1/campaigns/${campaignId}`, {
+        role_config: {
+          content_type: s.role === 'CREATOR' ? s.contentType || undefined : undefined,
+          task_mode: s.role === 'PARTICIPATOR' ? s.taskMode || undefined : undefined,
+          task_types: s.role === 'PARTICIPATOR' && s.taskTypes.length ? s.taskTypes : undefined,
+          budget_bucket: s.role === 'INFLUENCER' || offline ? s.budgetBucket || undefined : undefined,
+          following_size: s.role === 'INFLUENCER' ? s.followingSize || undefined : undefined,
+          audience_reach: offline ? s.audienceReach || undefined : undefined,
+        },
       });
       setQuote(null);
       setStep(4);
@@ -379,7 +414,54 @@ function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
             );
           })}
         </div>
+
+        <RoleConfigPanel s={s} set={set} />
       </div>
+    </div>
+  );
+}
+
+function RoleConfigPanel({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
+  if (!s.role || s.role === 'DISTRIBUTOR') return null;
+
+  const toggleTask = (t: string) =>
+    set({ taskTypes: s.taskTypes.includes(t) ? s.taskTypes.filter((x) => x !== t) : [...s.taskTypes, t] });
+
+  return (
+    <div className="mt-4 rounded-2xl border border-rule bg-paper p-5 sm:p-6">
+      {s.role === 'CREATOR' && (
+        <PillGroup label="What kind of content" options={CONTENT_TYPES} value={s.contentType} onSelect={(v) => set({ contentType: v })} />
+      )}
+
+      {s.role === 'PARTICIPATOR' && (
+        <div className="space-y-5">
+          <div>
+            <p className="mb-2 text-[14px] font-semibold text-ink">Step 1 · what type of task would you want the promoters to complete</p>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <RadioCard on={s.taskMode === 'ONLINE'} onClick={() => set({ taskMode: 'ONLINE', taskTypes: [] })}
+                title="Online task" body="Download an app, review on play store or AppStore, etc" />
+              <RadioCard on={s.taskMode === 'OFFLINE'} onClick={() => set({ taskMode: 'OFFLINE', taskTypes: [] })}
+                title="Offline task" body="Attend an event, share flyers, visit physical locations like restaurants, stores etc" />
+            </div>
+          </div>
+          {s.taskMode && (
+            <ChipMulti label="Task type" options={s.taskMode === 'ONLINE' ? TASK_TYPES_ONLINE : TASK_TYPES_OFFLINE} value={s.taskTypes} onToggle={toggleTask} />
+          )}
+          {s.taskMode === 'OFFLINE' && (
+            <>
+              <PillGroup label="Your budget" options={BUDGET_BUCKETS} value={s.budgetBucket} onSelect={(v) => set({ budgetBucket: v })} />
+              <PillGroup label="Potential audience reach" options={AUDIENCE_REACH} value={s.audienceReach} onSelect={(v) => set({ audienceReach: v })} />
+            </>
+          )}
+        </div>
+      )}
+
+      {s.role === 'INFLUENCER' && (
+        <div className="space-y-5">
+          <PillGroup label="Step 1 · Your budget" options={BUDGET_BUCKETS} value={s.budgetBucket} onSelect={(v) => set({ budgetBucket: v })} />
+          <PillGroup label="Step 2 · Preferred following size" options={FOLLOWING_SIZES} value={s.followingSize} onSelect={(v) => set({ followingSize: v })} />
+        </div>
+      )}
     </div>
   );
 }
@@ -562,5 +644,50 @@ function SelectCard({ on, onClick, children }: { on: boolean; onClick: () => voi
     >
       {children}
     </button>
+  );
+}
+
+function RadioCard({ on, onClick, title, body }: { on: boolean; onClick: () => void; title: string; body: string }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`flex items-start justify-between gap-3 rounded-2xl border p-4 text-left transition ${
+        on ? 'border-brand bg-brand/[0.04]' : 'border-rule bg-paper hover:border-ink/30'
+      }`}
+    >
+      <span>
+        <span className="block text-[14px] font-bold text-ink">{title}</span>
+        <span className="mt-1 block text-[12.5px] leading-snug text-muted">{body}</span>
+      </span>
+      <span className={`mt-0.5 grid h-5 w-5 shrink-0 place-items-center rounded-full border-2 ${on ? 'border-brand' : 'border-rule'}`}>
+        {on && <span className="h-2.5 w-2.5 rounded-full bg-brand" />}
+      </span>
+    </button>
+  );
+}
+
+function ChipMulti({ label, options, value, onToggle }: { label: string; options: string[]; value: string[]; onToggle: (v: string) => void }) {
+  return (
+    <div>
+      <p className="mb-2 text-[14px] font-semibold text-ink">{label}</p>
+      <div className="flex flex-wrap gap-2.5">
+        {options.map((o) => {
+          const on = value.includes(o);
+          return (
+            <button
+              key={o}
+              type="button"
+              onClick={() => onToggle(o)}
+              className={`rounded-full px-4 py-2 text-[13px] font-semibold transition ${
+                on ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+              }`}
+            >
+              {on ? '× ' : ''}{o}
+            </button>
+          );
+        })}
+      </div>
+    </div>
   );
 }
