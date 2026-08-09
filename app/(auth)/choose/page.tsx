@@ -29,6 +29,10 @@ function PathCard({ title, accent, body, href }: { title: string; accent: string
   );
 }
 
+// The promoter signup lives in the separate promoter app. In dev that's :4400;
+// set NEXT_PUBLIC_PROMOTER_URL per environment.
+const PROMOTER_URL = process.env.NEXT_PUBLIC_PROMOTER_URL ?? 'http://localhost:4400';
+
 export default function ChoosePage() {
   return (
     <div>
@@ -51,7 +55,7 @@ export default function ChoosePage() {
           title="Earn by"
           accent="promoting"
           body="See the fee before you accept, post from channels you already use, and get paid when it's verified."
-          href="/register?role=promoter"
+          href={`${PROMOTER_URL}/register`}
         />
       </div>
 
