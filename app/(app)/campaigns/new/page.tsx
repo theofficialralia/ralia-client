@@ -86,7 +86,8 @@ const AUDIENCE_REACH = ['10k – 50k', '50k – 100k', '100k – 500k', '500k �
 
 type State = {
   name: string; objective: string; description: string; destination_url: string;
-  imageFile: File | null; caption: string;
+  // Assets: 'HAVE' = client uploads files; 'DESIGN' = Ralia's team makes it.
+  creativeMode: '' | 'HAVE' | 'DESIGN'; assetFiles: File[]; designBrief: string;
   location: string; ageBucket: string; gender: string; language: string;
   categories: string[]; platform: string; role: string;
   // Per-role task config
@@ -96,7 +97,7 @@ type State = {
 
 const initial: State = {
   name: '', objective: 'AWARENESS', description: '', destination_url: '',
-  imageFile: null, caption: '',
+  creativeMode: '', assetFiles: [], designBrief: '',
   location: '', ageBucket: '', gender: '', language: '', categories: [], platform: '', role: '',
   contentType: '', taskMode: '', taskTypes: [], budgetBucket: '', followingSize: '', audienceReach: '',
 };
@@ -144,23 +145,24 @@ export default function NewCampaignPage() {
 
   async function saveAssets() {
     if (!campaignId) return;
+    if (!s.creativeMode) return setError('Choose whether you have creative or want Ralia to design it.');
+    if (s.creativeMode === 'HAVE' && s.assetFiles.length === 0) return setError('Upload at least one file, or switch to "Design one for me".');
     setBusy(true); setError(null);
     try {
-      if (s.imageFile) {
-        const form = new FormData();
-        form.append('kind', 'IMAGE');
-        form.append('file', s.imageFile);
-        await api.postForm(`/v1/campaigns/${campaignId}/assets`, form);
-      }
-      if (s.caption.trim()) {
-        const form = new FormData();
-        form.append('kind', 'CAPTION');
-        form.append('caption_text', s.caption.trim());
-        await api.postForm(`/v1/campaigns/${campaignId}/assets`, form);
+      if (s.creativeMode === 'HAVE') {
+        for (const file of s.assetFiles) {
+          const form = new FormData();
+          form.append('kind', assetKind(file));
+          form.append('file', file);
+          await api.postForm(`/v1/campaigns/${campaignId}/assets`, form);
+        }
+        await api.patch(`/v1/campaigns/${campaignId}`, { needs_creative: false });
+      } else {
+        await api.patch(`/v1/campaigns/${campaignId}`, { needs_creative: true, design_brief: s.designBrief || undefined });
       }
       setStep(3);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'Could not upload assets.');
+      setError(e instanceof ApiError ? e.message : 'Could not save your creative.');
     } finally {
       setBusy(false);
     }
@@ -325,26 +327,80 @@ function Brief({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
   );
 }
 
+function assetKind(file: File): string {
+  if (file.type.startsWith('image/')) return 'IMAGE';
+  if (file.type.startsWith('video/')) return 'VIDEO';
+  return 'DOCUMENT';
+}
+function fileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes}b`;
+  if (bytes < 1024 * 1024) return `${Math.round(bytes / 1024)}kb`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)}mb`;
+}
+function fileExt(name: string): string {
+  const m = name.split('.').pop();
+  return (m && m !== name ? m : 'file').toUpperCase().slice(0, 4);
+}
+
 function Assets({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
+  const addFiles = (list: FileList | null) => {
+    if (!list) return;
+    set({ creativeMode: 'HAVE', assetFiles: [...s.assetFiles, ...Array.from(list)] });
+  };
+  const removeFile = (i: number) => set({ assetFiles: s.assetFiles.filter((_, j) => j !== i) });
+
   return (
-    <div className="space-y-5">
-      <Header title="Add your creative" subtitle="What promoters will post. You can skip and add these later." />
-      <Field label="Campaign image" hint="JPEG, PNG or WebP, up to 10 MB.">
-        <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-rule bg-wash py-10 text-center transition hover:border-brand/40">
-          <input type="file" accept="image/png,image/jpeg,image/webp" className="hidden" onChange={(e) => set({ imageFile: e.target.files?.[0] ?? null })} />
-          {s.imageFile ? (
-            <span className="text-[14px] font-semibold text-ink">{s.imageFile.name}</span>
-          ) : (
-            <>
-              <span className="text-[14px] font-semibold text-ink">Click to upload</span>
-              <span className="mt-1 text-[12.5px] text-muted">or drag an image here</span>
-            </>
-          )}
+    <div className="space-y-6">
+      <Header title="Add your creative." subtitle="Or ask Ralia's design team to make one for you." />
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        {/* I have creative */}
+        <label
+          className={`flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed p-8 text-center transition ${
+            s.creativeMode === 'HAVE' ? 'border-brand bg-brand/[0.04]' : 'border-rule hover:border-ink/30'
+          }`}
+        >
+          <input type="file" multiple className="hidden" accept="image/*,video/*,.pdf"
+            onChange={(e) => addFiles(e.target.files)} />
+          <span className={`grid h-16 w-16 place-items-center rounded-full text-[22px] ${s.creativeMode === 'HAVE' ? 'bg-brand text-white' : 'bg-wash text-ink'}`}>↑</span>
+          <span className="mt-4 text-[18px] font-bold text-ink">I have creative</span>
+          <span className="mt-1 text-[13px] text-muted">Image, video, poster, caption. Multi-file OK.</span>
         </label>
-      </Field>
-      <Field label="Caption" hint="Optional — a suggested caption for promoters.">
-        <Textarea value={s.caption} onChange={(e) => set({ caption: e.target.value })} placeholder="Shop the collection — link in my status." />
-      </Field>
+
+        {/* Design one for me */}
+        <button type="button" onClick={() => set({ creativeMode: 'DESIGN' })}
+          className={`flex flex-col items-center justify-center rounded-2xl border-2 border-dashed p-8 text-center transition ${
+            s.creativeMode === 'DESIGN' ? 'border-brand bg-brand/[0.04]' : 'border-rule hover:border-ink/30'
+          }`}
+        >
+          <span className={`grid h-16 w-16 place-items-center rounded-full text-[22px] ${s.creativeMode === 'DESIGN' ? 'bg-brand text-white' : 'bg-wash text-ink'}`}>✦</span>
+          <span className="mt-4 text-[18px] font-bold text-ink">Design one for me</span>
+          <span className="mt-1 text-[13px] text-muted">Ralia&apos;s team designs your poster &amp; caption in 24h.</span>
+        </button>
+      </div>
+
+      {/* Uploaded file chips */}
+      {s.creativeMode === 'HAVE' && s.assetFiles.length > 0 && (
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {s.assetFiles.map((f, i) => (
+            <div key={i} className="flex items-center gap-3 rounded-2xl border border-rule bg-paper p-3">
+              <span className="grid h-11 w-11 shrink-0 place-items-center rounded-xl bg-wash text-[11px] font-bold text-muted">{fileExt(f.name)}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[14px] font-semibold text-ink">{f.name}</span>
+                <span className="block text-[12px] text-muted">{fileSize(f.size)}</span>
+              </span>
+              <button type="button" onClick={() => removeFile(i)} className="shrink-0 text-muted hover:text-ink" aria-label="Remove file">✕</button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Design brief */}
+      {s.creativeMode === 'DESIGN' && (
+        <Field label="What should we design?">
+          <Textarea value={s.designBrief} onChange={(e) => set({ designBrief: e.target.value })} placeholder="e.g poster, flyer, billboard etc" />
+        </Field>
+      )}
     </div>
   );
 }
