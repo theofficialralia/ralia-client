@@ -31,20 +31,26 @@ export default function CampaignsPage() {
         <div className="flex justify-center py-20"><Spinner className="h-7 w-7 text-brand" /></div>
       ) : data && data.length > 0 ? (
         <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {data.map((c) => (
-            <Link key={c.id} href={`/campaigns/${c.id}`} className="card p-5 transition hover:shadow-lg">
-              <div className="flex items-center justify-between">
-                <StatusPill status={c.status} />
-                <span className="text-[12.5px] text-muted">{c.slots_total} slots</span>
-              </div>
-              <h3 className="mt-3 text-[16px] font-bold text-ink">{c.name}</h3>
-              <p className="mt-1 text-[13px] capitalize text-muted">{c.objective.toLowerCase().replace('_', ' ')}</p>
-              <div className="mt-4 flex items-baseline justify-between border-t border-rule pt-4">
-                <span className="text-[13px] text-muted">Budget</span>
-                <span className="font-bold text-ink">{c.budget.amount_display}</span>
-              </div>
-            </Link>
-          ))}
+          {data.map((c) => {
+            // Half-finished campaigns resume in the wizard; the rest open their
+            // delivery view. (A draft has no delivery data to show.)
+            const draft = c.status === 'DRAFT' || c.status === 'QUOTED';
+            const href = draft ? `/campaigns/new?id=${c.id}` : `/campaigns/${c.id}`;
+            return (
+              <Link key={c.id} href={href} className="card p-5 transition hover:shadow-lg">
+                <div className="flex items-center justify-between">
+                  <StatusPill status={c.status} />
+                  <span className="text-[12.5px] text-muted">{c.slots_total} slots</span>
+                </div>
+                <h3 className="mt-3 text-[16px] font-bold text-ink">{c.name}</h3>
+                <p className="mt-1 text-[13px] capitalize text-muted">{c.objective.toLowerCase().replace('_', ' ')}</p>
+                <div className="mt-4 flex items-baseline justify-between border-t border-rule pt-4">
+                  <span className="text-[13px] text-muted">{draft ? 'Continue setup' : 'Budget'}</span>
+                  <span className={`font-bold ${draft ? 'text-brand-700' : 'text-ink'}`}>{draft ? 'Resume →' : c.budget.amount_display}</span>
+                </div>
+              </Link>
+            );
+          })}
         </div>
       ) : (
         <div className="card mt-6 px-6 py-20 text-center">

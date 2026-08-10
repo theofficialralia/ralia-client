@@ -136,6 +136,17 @@ export type CampaignStatus =
   | 'DRAFT' | 'QUOTED' | 'PENDING_APPROVAL' | 'REJECTED' | 'CONFIRMING_PAYMENT'
   | 'LIVE' | 'PAUSED' | 'ENDED' | 'FULFILLED' | 'SETTLED' | 'CANCELLED';
 
+export type CampaignTargetingView = {
+  states: string[]; lgas: string[]; age_min: number | null; age_max: number | null;
+  genders: string[]; languages: string[]; categories: string[]; platforms: string[];
+  min_effective_reach: number; roles: string[];
+};
+
+export type RoleConfig = {
+  content_type?: string; task_mode?: string; task_types?: string[];
+  budget_bucket?: string; following_size?: string; audience_reach?: string;
+};
+
 export type Campaign = {
   id: string;
   name: string;
@@ -150,6 +161,10 @@ export type Campaign = {
   budget: Money;
   quoted_at: string | null;
   total_clicks?: number;
+  role_config?: RoleConfig | null;
+  needs_creative?: boolean;
+  design_brief?: string | null;
+  targeting?: CampaignTargetingView | null;
 };
 
 export type Quote = {

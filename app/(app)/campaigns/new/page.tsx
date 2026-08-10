@@ -1,8 +1,9 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { api, ApiError, uuid, type Campaign, type CampaignPlan, type Quote } from '@/lib/api';
+import { Spinner } from '@/components/ui/Spinner';
 import { useAuth } from '@/lib/auth';
 import { loadPaystack, PAYSTACK_PUBLIC_KEY, paystackConfigured } from '@/lib/paystack';
 import { Button } from '@/components/ui/Button';
@@ -106,17 +107,39 @@ const initial: State = {
 // Quote step (commitPlan), driven by budget and the category floor.
 const PLACEHOLDER_SLOTS = 5;
 
-export default function NewCampaignPage() {
+function NewCampaignInner() {
   const router = useRouter();
   const { user } = useAuth();
+  const resumeId = useSearchParams().get('id');
   const [step, setStep] = useState(1);
   const [campaignId, setCampaignId] = useState<string | null>(null);
   const [s, setS] = useState<State>(initial);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [hydrating, setHydrating] = useState(!!resumeId);
 
   const set = (patch: Partial<State>) => setS((prev) => ({ ...prev, ...patch }));
+
+  // Resume a draft/quoted campaign: load it and refill the wizard.
+  useEffect(() => {
+    if (!resumeId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const c = await api.get<Campaign>(`/v1/campaigns/${resumeId}`);
+        if (cancelled) return;
+        setCampaignId(c.id);
+        setS((prev) => hydrateState(prev, c));
+        setStep(c.status === 'QUOTED' ? 4 : 1);
+      } catch {
+        // Fall back to a fresh campaign if the draft can't be loaded.
+      } finally {
+        if (!cancelled) setHydrating(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [resumeId]);
 
   async function saveBrief() {
     if (!s.name.trim()) return setError('Give your campaign a name.');
@@ -146,7 +169,8 @@ export default function NewCampaignPage() {
   async function saveAssets() {
     if (!campaignId) return;
     if (!s.creativeMode) return setError('Choose whether you have creative or want Ralia to design it.');
-    if (s.creativeMode === 'HAVE' && s.assetFiles.length === 0) return setError('Upload at least one file, or switch to "Design one for me".');
+    // Files are optional here (you can add them now or later, or you may already
+    // have uploaded some on a resumed draft) — only the choice of mode is required.
     setBusy(true); setError(null);
     try {
       if (s.creativeMode === 'HAVE') {
@@ -257,6 +281,10 @@ export default function NewCampaignPage() {
       setError(e instanceof ApiError ? e.message : 'We could not confirm the payment. If you were charged, contact support.');
       setBusy(false);
     }
+  }
+
+  if (hydrating) {
+    return <div className="flex justify-center py-24"><Spinner className="h-8 w-8 text-brand" /></div>;
   }
 
   return (
@@ -745,5 +773,46 @@ function ChipMulti({ label, options, value, onToggle }: { label: string; options
         })}
       </div>
     </div>
+  );
+}
+
+// ── Resume: map a saved campaign back into wizard state ─────
+
+function hydrateState(prev: State, c: Campaign): State {
+  const t = c.targeting;
+  const loc = t ? LOCATIONS.find((l) => JSON.stringify([...l.states].sort()) === JSON.stringify([...(t.states ?? [])].sort())) : undefined;
+  const age = t ? AGE_BUCKETS.find((a) => (a.min ?? null) === (t.age_min ?? null) && (a.max ?? null) === (t.age_max ?? null)) : undefined;
+  const gender = t ? GENDERS.find((g) => JSON.stringify([...g.value].sort()) === JSON.stringify([...(t.genders ?? [])].sort())) : undefined;
+  const platform = t?.platforms?.[0] ? PLATFORMS.find((p) => p.value === t.platforms[0]) : undefined;
+  const rc = c.role_config ?? {};
+  return {
+    ...prev,
+    name: c.name ?? '',
+    objective: c.objective ?? 'AWARENESS',
+    description: c.description ?? '',
+    destination_url: c.destination_url ?? '',
+    creativeMode: c.needs_creative ? 'DESIGN' : prev.creativeMode,
+    designBrief: c.design_brief ?? '',
+    location: loc?.label ?? '',
+    ageBucket: age?.label ?? '',
+    gender: gender?.label ?? '',
+    language: t?.languages?.[0] ?? '',
+    categories: t?.categories ?? [],
+    platform: platform?.value ?? '',
+    role: t?.roles?.[0] ?? '',
+    contentType: rc.content_type ?? '',
+    taskMode: (rc.task_mode as State['taskMode']) ?? '',
+    taskTypes: rc.task_types ?? [],
+    budgetBucket: rc.budget_bucket ?? '',
+    followingSize: rc.following_size ?? '',
+    audienceReach: rc.audience_reach ?? '',
+  };
+}
+
+export default function NewCampaignPage() {
+  return (
+    <Suspense fallback={<div className="flex justify-center py-24"><Spinner className="h-8 w-8 text-brand" /></div>}>
+      <NewCampaignInner />
+    </Suspense>
   );
 }
