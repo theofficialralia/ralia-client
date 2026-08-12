@@ -42,10 +42,10 @@ export function NotificationBell() {
     <div className="relative" ref={ref}>
       <button
         onClick={() => setOpen((o) => !o)}
-        className="relative grid h-9 w-9 place-items-center rounded-full border border-rule bg-paper text-[15px]"
+        className="relative grid h-9 w-9 place-items-center rounded-full border border-rule bg-paper text-body transition hover:text-ink"
         aria-label={`Notifications${unread ? `, ${unread} unread` : ''}`}
       >
-        🔔
+        <BellIcon />
         {unread > 0 && (
           <span className="absolute -right-0.5 -top-0.5 flex min-w-[18px] items-center justify-center rounded-full bg-brand px-1 text-[10px] font-bold leading-[18px] text-white">
             {unread > 9 ? '9+' : unread}
@@ -86,5 +86,14 @@ export function NotificationBell() {
         </div>
       )}
     </div>
+  );
+}
+
+function BellIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M6 9.5a6 6 0 0 1 12 0c0 3.2.7 5 1.5 6.1.4.6 0 1.4-.7 1.4H5.2c-.7 0-1.1-.8-.7-1.4C5.3 14.5 6 12.7 6 9.5Z" />
+      <path d="M10 20a2 2 0 0 0 4 0" />
+    </svg>
   );
 }

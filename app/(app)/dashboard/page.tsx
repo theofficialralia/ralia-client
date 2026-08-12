@@ -1,11 +1,11 @@
 'use client';
 
-import Link from 'next/link';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, type DashboardSummary } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { StatusPill } from '@/components/ui/StatusPill';
 import { Spinner } from '@/components/ui/Spinner';
+import { CampaignFilterPills, CampaignsTable, matchesFilter, type CampaignFilter } from '@/components/campaigns/CampaignsTable';
 
 function greeting() {
   const h = new Date().getHours();
@@ -14,12 +14,14 @@ function greeting() {
 
 export default function DashboardPage() {
   const { user } = useAuth();
+  const [filter, setFilter] = useState<CampaignFilter>('all');
   const { data, isLoading, isError } = useQuery({
     queryKey: ['dashboard-summary'],
     queryFn: () => api.get<DashboardSummary>('/v1/dashboard/summary'),
   });
 
   const name = user?.email?.split('@')[0] ?? 'there';
+  const rows = (data?.campaigns ?? []).filter((c) => matchesFilter(c.status, filter));
 
   return (
     <div className="mx-auto max-w-6xl">
@@ -70,64 +72,21 @@ export default function DashboardPage() {
 
       {/* Campaigns table */}
       <div className="mt-9">
-        <p className="text-[13px] text-muted">Campaigns</p>
-        <h2 className="text-[22px] font-extrabold tracking-tight text-ink">Everything you&apos;re running</h2>
+        <div className="flex flex-wrap items-end justify-between gap-3">
+          <div>
+            <p className="text-[13px] text-muted">Campaigns</p>
+            <h2 className="text-[22px] font-extrabold tracking-tight text-ink">Everything you&apos;re running</h2>
+          </div>
+          {data && data.campaigns.length > 0 && <CampaignFilterPills value={filter} onChange={setFilter} />}
+        </div>
 
-        <div className="card mt-4 overflow-hidden">
+        <div className="mt-4">
           {isLoading ? (
-            <div className="flex justify-center py-16">
-              <Spinner className="h-7 w-7 text-brand" />
-            </div>
+            <div className="card flex justify-center py-16"><Spinner className="h-7 w-7 text-brand" /></div>
           ) : isError ? (
-            <p className="px-6 py-16 text-center text-[14px] text-muted">Couldn&apos;t load your campaigns.</p>
-          ) : data && data.campaigns.length > 0 ? (
-            <table className="w-full text-[14px]">
-              <thead>
-                <tr className="border-b border-rule text-left text-[12px] uppercase tracking-wide text-muted">
-                  <th className="px-6 py-3.5 font-semibold">Campaign</th>
-                  <th className="px-4 py-3.5 font-semibold">Status</th>
-                  <th className="px-4 py-3.5 font-semibold">Spent</th>
-                  <th className="px-4 py-3.5 font-semibold">Views</th>
-                  <th className="px-4 py-3.5 font-semibold">Completed</th>
-                  <th className="px-4 py-3.5" />
-                </tr>
-              </thead>
-              <tbody>
-                {data.campaigns.map((c) => (
-                  <tr key={c.id} className="border-b border-rule/70 last:border-0 hover:bg-wash/60">
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-ink">{c.name}</div>
-                      <div className="text-[12.5px] capitalize text-muted">
-                        {c.objective.toLowerCase().replace('_', ' ')} · {c.slots_total} slots
-                      </div>
-                    </td>
-                    <td className="px-4 py-4"><StatusPill status={c.status} /></td>
-                    <td className="px-4 py-4">
-                      <div className="font-semibold text-ink">{c.spent.amount_display}</div>
-                      <div className="text-[12.5px] text-muted">of {c.budget.amount_display}</div>
-                    </td>
-                    <td className="px-4 py-4 tabular-nums">{c.views.toLocaleString('en-NG')}</td>
-                    <td className="px-4 py-4 tabular-nums">{c.completed}/{c.slots_total}</td>
-                    <td className="px-4 py-4 text-right">
-                      <Link href={`/campaigns/${c.id}`} className="inline-flex items-center gap-1 font-semibold text-brand-700">
-                        Open
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-                          <path d="M7 17 17 7M8 7h9v9" />
-                        </svg>
-                      </Link>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <p className="card px-6 py-16 text-center text-[14px] text-muted">Couldn&apos;t load your campaigns.</p>
           ) : (
-            <div className="px-6 py-16 text-center">
-              <p className="text-[15px] font-semibold text-ink">No campaigns yet</p>
-              <p className="mt-1 text-[13.5px] text-muted">Create your first campaign to start reaching real audiences.</p>
-              <Link href="/campaigns/new" className="mt-4 inline-block font-semibold text-brand-700">
-                + New campaign
-              </Link>
-            </div>
+            <CampaignsTable rows={rows} empty={data && data.campaigns.length > 0 ? <p className="text-[14px] text-muted">No campaigns in this filter.</p> : undefined} />
           )}
         </div>
       </div>

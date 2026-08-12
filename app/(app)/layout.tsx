@@ -1,16 +1,22 @@
 'use client';
 
 import Link from 'next/link';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { NotificationBell } from '@/components/layout/NotificationBell';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { ThemeToggle } from '@/components/layout/ThemeToggle';
 import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
+import { api, type ClientProfile } from '@/lib/api';
 import { useAuth, useRequireAuth } from '@/lib/auth';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { loading, user } = useRequireAuth();
   const { user: current } = useAuth();
+  const [collapsed, setCollapsed] = useState(false);
+  const profile = useQuery({ queryKey: ['client-profile'], queryFn: () => api.get<ClientProfile>('/v1/clients/me'), enabled: !!user });
+  const orgName = profile.data?.name ?? current?.email?.split('@')[0] ?? 'Account';
 
   if (loading || !user) {
     return (
@@ -22,7 +28,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-wash">
-      <Sidebar />
+      <Sidebar collapsed={collapsed} onToggleCollapse={() => setCollapsed((c) => !c)} />
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-rule bg-wash/80 px-6 py-4 backdrop-blur">
           <div className="relative hidden max-w-lg flex-1 sm:block">
@@ -37,9 +43,9 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             <ThemeToggle />
             <div className="hidden items-center gap-2 sm:flex">
               <span className="grid h-9 w-9 place-items-center rounded-full bg-brand text-[12px] font-bold text-white">
-                {current?.email?.slice(0, 2).toUpperCase()}
+                {orgName.slice(0, 2).toUpperCase()}
               </span>
-              <span className="text-[14px] font-semibold text-ink">{current?.email?.split('@')[0]}</span>
+              <span className="text-[14px] font-semibold text-ink">{orgName}</span>
             </div>
             <Link href="/campaigns/new">
               <Button size="md">

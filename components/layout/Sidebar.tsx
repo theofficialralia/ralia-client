@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
-import { Logo } from '@/components/brand/Logo';
+import { Logo, LogoMark } from '@/components/brand/Logo';
 import { api, type ClientProfile } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
@@ -30,7 +30,7 @@ function profileCompleteness(p: ClientProfile): number {
   return Math.round((checks.filter(Boolean).length / checks.length) * 100);
 }
 
-export function Sidebar() {
+export function Sidebar({ collapsed = false, onToggleCollapse }: { collapsed?: boolean; onToggleCollapse?: () => void }) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   // Shares the ['client-profile'] cache with Settings, so it's deduped.
@@ -39,29 +39,37 @@ export function Sidebar() {
     queryFn: () => api.get<ClientProfile>('/v1/clients/me'),
   });
   const pct = profile.data ? profileCompleteness(profile.data) : null;
+  const orgName = profile.data?.name ?? user?.email?.split('@')[0] ?? 'Account';
 
   return (
-    <aside className="flex w-[260px] shrink-0 flex-col border-r border-rule bg-sidebar text-white">
-      <div className="px-5 py-6">
-        <Logo label="Businesses" className="[&_div]:text-white [&_.text-muted]:text-white/50" />
+    <aside className={`flex shrink-0 flex-col border-r border-rule bg-sidebar text-white transition-[width] duration-200 ${collapsed ? 'w-[76px]' : 'w-[260px]'}`}>
+      <div className={`flex items-center justify-between py-6 ${collapsed ? 'px-3' : 'px-5'}`}>
+        {collapsed ? <LogoMark className="h-8 w-8" /> : <Logo label="Businesses" className="[&_div]:text-white [&_.text-muted]:text-white/50" />}
+        {onToggleCollapse && (
+          <button
+            onClick={onToggleCollapse}
+            className={`flex h-8 w-8 items-center justify-center rounded-lg text-white/45 transition hover:bg-white/10 hover:text-white ${collapsed ? 'hidden' : ''}`}
+            aria-label="Collapse sidebar"
+          >
+            <PanelIcon />
+          </button>
+        )}
       </div>
 
-      {pct !== null && pct < 100 && (
+      {!collapsed && pct !== null && pct < 100 && (
         <Link
           href="/settings"
           className="mx-4 mb-4 block rounded-2xl border border-white/10 bg-white/[0.04] p-4 transition hover:bg-white/[0.07]"
         >
           <div className="flex items-center gap-2">
-            <span className="grid h-6 w-6 place-items-center rounded-full border-2 border-warn text-[11px] font-bold text-warn">
-              !
-            </span>
+            <span className="grid h-6 w-6 place-items-center rounded-full border-2 border-warn text-[11px] font-bold text-warn">!</span>
             <span className="text-[15px] font-bold">{pct}%</span>
           </div>
           <p className="mt-2 text-[12.5px] leading-snug text-white/55">Complete your profile to get better matches</p>
         </Link>
       )}
 
-      <nav className="flex-1 space-y-1 px-3">
+      <nav className={`flex-1 space-y-1 ${collapsed ? 'px-2' : 'px-3'}`}>
         {nav.map((item) => {
           const active = pathname.startsWith(item.href);
           const Icon = item.icon;
@@ -69,46 +77,61 @@ export function Sidebar() {
             <Link
               key={item.href}
               href={item.href}
-              className={`flex items-center gap-3 rounded-xl px-4 py-3 text-[14.5px] font-semibold transition ${
+              title={collapsed ? item.label : undefined}
+              className={`flex items-center rounded-xl py-3 text-[14.5px] font-semibold transition ${collapsed ? 'justify-center px-0' : 'gap-3 px-4'} ${
                 active ? 'bg-white/10 text-white' : 'text-white/60 hover:bg-white/5 hover:text-white'
               }`}
             >
               <Icon />
-              {item.label}
+              {!collapsed && item.label}
             </Link>
           );
         })}
       </nav>
 
-      <div className="space-y-1 px-3 pb-3">
-        <button className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-[14.5px] font-semibold text-white/60 hover:bg-white/5 hover:text-white">
-          <LifebuoyIcon /> Help &amp; Support
-        </button>
+      <div className={`space-y-1 pb-3 ${collapsed ? 'px-2' : 'px-3'}`}>
+        <a
+          href="mailto:support@ralia.app"
+          title={collapsed ? 'Help & Support' : undefined}
+          className={`flex w-full items-center rounded-xl py-3 text-[14.5px] font-semibold text-white/60 transition hover:bg-white/5 hover:text-white ${collapsed ? 'justify-center px-0' : 'gap-3 px-4'}`}
+        >
+          <LifebuoyIcon /> {!collapsed && 'Help & Support'}
+        </a>
         <button
           onClick={() => logout()}
-          className="flex w-full items-center gap-3 rounded-xl px-4 py-3 text-[14.5px] font-semibold text-white/60 hover:bg-white/5 hover:text-white"
+          title={collapsed ? 'Log out' : undefined}
+          className={`flex w-full items-center rounded-xl py-3 text-[14.5px] font-semibold text-white/60 transition hover:bg-white/5 hover:text-white ${collapsed ? 'justify-center px-0' : 'gap-3 px-4'}`}
         >
-          <LogoutIcon /> Log out
+          <LogoutIcon /> {!collapsed && 'Log out'}
         </button>
       </div>
 
       <Link
         href="/settings"
-        className={`m-3 flex items-center gap-3 rounded-2xl border p-3 transition ${
-          pathname.startsWith('/settings')
-            ? 'border-white/20 bg-white/[0.08]'
-            : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.07]'
+        title={collapsed ? orgName : undefined}
+        className={`m-3 flex items-center rounded-2xl border p-3 transition ${collapsed ? 'justify-center' : 'gap-3'} ${
+          pathname.startsWith('/settings') ? 'border-white/20 bg-white/[0.08]' : 'border-white/10 bg-white/[0.04] hover:bg-white/[0.07]'
         }`}
       >
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full bg-brand text-[13px] font-bold text-white">
-          {initials(user?.email)}
+          {initials(orgName)}
         </span>
-        <div className="min-w-0">
-          <div className="truncate text-[14px] font-bold">{user?.email?.split('@')[0] ?? 'Account'}</div>
-          <div className="truncate text-[12px] text-white/50">{user?.email}</div>
-        </div>
+        {!collapsed && (
+          <div className="min-w-0">
+            <div className="truncate text-[14px] font-bold">{orgName}</div>
+            <div className="truncate text-[12px] text-white/50">{user?.email}</div>
+          </div>
+        )}
       </Link>
     </aside>
+  );
+}
+
+function PanelIcon() {
+  return (
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+      <rect x="3.5" y="4.5" width="17" height="15" rx="2" /><path d="M9.5 4.5v15" /><path d="m15.5 9.5-2.5 2.5 2.5 2.5" />
+    </svg>
   );
 }
 
