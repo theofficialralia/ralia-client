@@ -6,6 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { Logo, LogoMark } from '@/components/brand/Logo';
 import { api, type ClientProfile } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { SUPPORT } from '@/lib/support';
 
 const nav = [
   { href: '/dashboard', label: 'Dashboard', icon: GridIcon },
@@ -91,7 +92,9 @@ export function Sidebar({ collapsed = false, onToggleCollapse }: { collapsed?: b
 
       <div className={`space-y-1 pb-3 ${collapsed ? 'px-2' : 'px-3'}`}>
         <a
-          href="mailto:support@ralia.app"
+          href={SUPPORT.whatsappUrl}
+          target="_blank"
+          rel="noreferrer"
           title={collapsed ? 'Help & Support' : undefined}
           className={`flex w-full items-center rounded-xl py-3 text-[14.5px] font-semibold text-white/60 transition hover:bg-white/5 hover:text-white ${collapsed ? 'justify-center px-0' : 'gap-3 px-4'}`}
         >

@@ -4,9 +4,9 @@
   "private": true,
   "description": "Ralia — business (client) web app",
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev -p 6300",
     "build": "next build",
-    "start": "next start",
+    "start": "next start -p 6300",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
     "gen:api": "openapi-typescript api-contract/openapi.json -o lib/api-types.ts"

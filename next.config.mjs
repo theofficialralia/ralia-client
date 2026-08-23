@@ -1,5 +1,5 @@
 /** @type {import('next').NextConfig} */
-const API_ORIGIN = process.env.API_ORIGIN ?? 'http://localhost:3000';
+const API_ORIGIN = process.env.API_ORIGIN ?? 'http://localhost:6100';
 
 const nextConfig = {
   reactStrictMode: true,

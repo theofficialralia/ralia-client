@@ -29,9 +29,9 @@ function PathCard({ title, accent, body, href }: { title: string; accent: string
   );
 }
 
-// The promoter signup lives in the separate promoter app. In dev that's :4400;
+// The promoter signup lives in the separate promoter app. In dev that's :6400;
 // set NEXT_PUBLIC_PROMOTER_URL per environment.
-const PROMOTER_URL = process.env.NEXT_PUBLIC_PROMOTER_URL ?? 'http://localhost:4400';
+const PROMOTER_URL = process.env.NEXT_PUBLIC_PROMOTER_URL ?? 'http://localhost:6400';
 
 export default function ChoosePage() {
   return (
