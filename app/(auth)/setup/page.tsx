@@ -8,11 +8,10 @@ import { useRequireAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/Button';
 import { Field, Input } from '@/components/ui/Field';
 import { Spinner } from '@/components/ui/Spinner';
+import { CATEGORIES } from '@/lib/campaign-options';
 
-const SECTORS = [
-  'Food & drink', 'Fashion', 'Beauty', 'Tech', 'Finance', 'Health', 'Education',
-  'Entertainment', 'Retail', 'Services', 'Other',
-];
+// Business sector uses the shared Category-of-Interest taxonomy.
+const SECTORS = CATEGORIES;
 
 const SOCIALS = [
   { value: 'WHATSAPP', label: 'WhatsApp' },

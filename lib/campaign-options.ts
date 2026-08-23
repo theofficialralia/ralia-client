@@ -25,8 +25,25 @@ export const ROLES = [
   { value: 'INFLUENCER', label: 'Influencer' },
 ] as const;
 
+/**
+ * The single Category-of-Interest taxonomy (dev-support spec R736-GEN-OD-00001).
+ * Used for campaign categories, promoter preferred_categories, and business
+ * sector — they must match so matching's categoryFit actually lines up.
+ */
 export const CATEGORIES = [
-  'Fashion', 'Tech', 'Food', 'Finance', 'Health', 'Education', 'Entertainment', 'Sports', 'Beauty', 'Travel',
+  'Technology & Digital Products',
+  'Financial Services & Fintech',
+  'Consumer Goods & Retail (FMCG)',
+  'Lifestyle & Personal Care',
+  'Health & Pharmaceuticals',
+  'Entertainment, Media & Gaming',
+  'Real Estate & Construction',
+  'Travel',
+  'Hospitality & Leisure',
+  'Education & Career Services',
+  'Mobility',
+  'Logistics & Utilities',
+  'Other / General',
 ];
 
 export const LANGUAGES = ['English', 'Pidgin', 'Hausa', 'Yoruba', 'Igbo', 'Efik', 'Tiv', 'Fulfulde'];

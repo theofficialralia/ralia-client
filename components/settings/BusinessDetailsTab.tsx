@@ -4,11 +4,10 @@ import { useState } from 'react';
 import { api, ApiError, type ClientProfile, type ClientSocial } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, Textarea } from '@/components/ui/Field';
+import { CATEGORIES } from '@/lib/campaign-options';
 
-const SECTORS = [
-  'Food & Drink', 'Fashion', 'Beauty', 'Tech', 'Finance', 'Health', 'Education',
-  'Entertainment', 'Retail', 'Services', 'Other',
-];
+// Business sector uses the shared Category-of-Interest taxonomy.
+const SECTORS = CATEGORIES;
 
 const SOCIALS = [
   { value: 'WHATSAPP', label: 'WhatsApp' },

@@ -9,6 +9,7 @@ import { loadPaystack, PAYSTACK_PUBLIC_KEY, paystackConfigured } from '@/lib/pay
 import { Button } from '@/components/ui/Button';
 import { Field, Input, Textarea } from '@/components/ui/Field';
 import { Stepper } from '@/components/campaigns/wizard/Stepper';
+import { CATEGORIES } from '@/lib/campaign-options';
 
 // ── Design option sets (labels map to backend values) ─────────
 
@@ -44,12 +45,7 @@ const GENDERS = [
 
 const LANGUAGES = ['English', 'Yoruba', 'Igbo', 'Hausa', 'Pidgin'];
 
-const CATEGORIES = [
-  'Technology & Digital Products', 'Financial Services & Fintech', 'Consumer Goods & Retail (FMCG)',
-  'Lifestyle & Personal Care', 'Health & Pharmaceuticals', 'Entertainment, Media & Gaming',
-  'Real Estate & Construction', 'Travel', 'Hospitality & Leisure', 'Education & Career Services',
-  'Mobility', 'Logistics & Utilities', 'Other / General',
-];
+// CATEGORIES: the shared Category-of-Interest taxonomy (see lib/campaign-options).
 
 const PLATFORMS = [
   { label: 'WhatsApp', value: 'WHATSAPP_STATUS' },
