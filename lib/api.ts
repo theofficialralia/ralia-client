@@ -160,6 +160,10 @@ export type Campaign = {
   price: Money | null;
   budget: Money;
   quoted_at: string | null;
+  starts_at?: string | null;
+  ends_at?: string | null;
+  cadence?: Cadence;
+  posts_required?: number;
   total_clicks?: number;
   role_config?: RoleConfig | null;
   needs_creative?: boolean;
@@ -172,14 +176,18 @@ export type Quote = {
   unit_price: Money;
   promoter_fee: Money;
   slots_total: number;
+  posts_required: number;
   estimated_reach: number;
   eligible_promoters: number;
   active_filters: number;
 };
 
+export type Cadence = 'ONE_OFF' | 'DAILY' | 'WEEKLY' | 'CUSTOM';
+
 export type CampaignPlan = {
   unit_price: Money;
   slots: number;
+  posts_required: number;
   total_price: Money;
   promoter_fee: Money;
   reach_per_slot: number;

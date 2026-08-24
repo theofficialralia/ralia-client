@@ -140,7 +140,10 @@ function Stat({ label, value, foot }: { label: string; value: string; foot: stri
 }
 
 function Lightbox({ item, onClose }: { item: EvidenceItem; onClose: () => void }) {
-  const showImage = item.image_url && item.image_url.startsWith('http');
+  const [imgOk, setImgOk] = useState(true);
+  // image_url is served by the API (/v1/files/:id streams local, redirects to the CDN
+  // otherwise), so any set URL is renderable — fall back only if the load actually fails.
+  const showImage = !!item.image_url && imgOk;
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm animate-fade-in"
@@ -162,9 +165,10 @@ function Lightbox({ item, onClose }: { item: EvidenceItem; onClose: () => void }
         </div>
         <div className="flex aspect-[4/5] items-center justify-center bg-ink/5">
           {showImage ? (
-            <img src={item.image_url!} alt="Proof" className="h-full w-full object-contain" />
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={item.image_url!} alt="Proof" className="h-full w-full object-contain" onError={() => setImgOk(false)} />
           ) : (
-            <span className="text-[13px] text-muted">Screenshot preview unavailable in local storage</span>
+            <span className="text-[13px] text-muted">Screenshot unavailable</span>
           )}
         </div>
         <div className="flex items-center justify-between px-5 py-4">

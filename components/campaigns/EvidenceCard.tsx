@@ -5,13 +5,13 @@ import type { EvidenceItem } from '@/lib/api';
 import { platformLabel, timeAgo } from '@/lib/format';
 
 /**
- * One promoter's proof. The screenshot is a signed URL from the API; in dev the
- * storage provider returns a file:// path the browser cannot load, so we fall
- * back to a branded placeholder. In prod (R2/S3) it's a real https URL.
+ * One promoter's proof. image_url is served by the API (/v1/files/:id streams the
+ * local object, or redirects to the CDN), so any set URL is renderable — we fall
+ * back to a branded placeholder only if the load actually fails.
  */
 export function EvidenceCard({ item, onOpen }: { item: EvidenceItem; onOpen: () => void }) {
   const [imgOk, setImgOk] = useState(true);
-  const showImage = item.image_url && item.image_url.startsWith('http') && imgOk;
+  const showImage = !!item.image_url && imgOk;
 
   return (
     <button

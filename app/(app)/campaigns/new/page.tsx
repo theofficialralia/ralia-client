@@ -42,6 +42,11 @@ const GENDERS = [
   { label: 'Men', value: ['MALE'] },
   { label: 'Both', value: [] as string[] },
 ];
+// Multi-select gender options — no "Both" (selecting neither, or both, = everyone).
+const GENDER_OPTIONS = [
+  { label: 'Women', value: 'FEMALE' },
+  { label: 'Men', value: 'MALE' },
+];
 
 const LANGUAGES = ['English', 'Yoruba', 'Igbo', 'Hausa', 'Pidgin'];
 
@@ -83,10 +88,17 @@ const AUDIENCE_REACH = ['10k – 50k', '50k – 100k', '100k – 500k', '500k �
 
 type State = {
   name: string; objective: string; description: string; destination_url: string;
+  // Run window (client-facing). Empty = "starts as soon as approved" / no fixed end.
+  startsAt: string; endsAt: string;
+  // §multi-day: how often each promoter posts, and (for CUSTOM) how many times.
+  cadence: 'ONE_OFF' | 'DAILY' | 'WEEKLY' | 'CUSTOM'; customPosts: string;
   // Assets: 'HAVE' = client uploads files; 'DESIGN' = Ralia's team makes it.
   creativeMode: '' | 'HAVE' | 'DESIGN'; assetFiles: File[]; designBrief: string;
-  location: string; ageBucket: string; gender: string; language: string;
-  categories: string[]; platform: string; role: string;
+  // Targeting is multi-select: a client can target several states, ages, genders,
+  // languages and platforms at once (stored as label lists, mapped to the API's
+  // arrays in saveTargeting).
+  locations: string[]; ageBuckets: string[]; genders: string[]; languages: string[];
+  categories: string[]; platforms: string[]; role: string;
   // Per-role task config
   contentType: string; taskMode: '' | 'ONLINE' | 'OFFLINE'; taskTypes: string[];
   budgetBucket: string; followingSize: string; audienceReach: string;
@@ -94,8 +106,10 @@ type State = {
 
 const initial: State = {
   name: '', objective: 'AWARENESS', description: '', destination_url: '',
+  startsAt: '', endsAt: '',
+  cadence: 'ONE_OFF', customPosts: '',
   creativeMode: '', assetFiles: [], designBrief: '',
-  location: '', ageBucket: '', gender: '', language: '', categories: [], platform: '', role: '',
+  locations: [], ageBuckets: [], genders: [], languages: [], categories: [], platforms: [], role: '',
   contentType: '', taskMode: '', taskTypes: [], budgetBucket: '', followingSize: '', audienceReach: '',
 };
 
@@ -140,6 +154,8 @@ function NewCampaignInner() {
   async function saveBrief() {
     if (!s.name.trim()) return setError('Give your campaign a name.');
     if (!/^https?:\/\//.test(s.destination_url)) return setError('Enter a valid destination link (https://…).');
+    if (s.startsAt && s.endsAt && s.endsAt <= s.startsAt) return setError('The end date must be after the start date.');
+    if (s.cadence !== 'ONE_OFF' && !s.endsAt) return setError('Set an end date before choosing a repeating schedule.');
     setBusy(true); setError(null);
     try {
       const body = {
@@ -148,6 +164,11 @@ function NewCampaignInner() {
         description: s.description || undefined,
         destination_url: s.destination_url,
         slots_total: PLACEHOLDER_SLOTS,
+        // Nulls explicitly clear a previously-set window on a resumed draft.
+        starts_at: s.startsAt || null,
+        ends_at: s.endsAt || null,
+        cadence: s.cadence,
+        posts_required: computePosts(s),
       };
       const campaign = campaignId
         ? await api.patch<Campaign>(`/v1/campaigns/${campaignId}`, body)
@@ -193,17 +214,26 @@ function NewCampaignInner() {
     if (!s.role) return setError('Choose who should promote this.');
     setBusy(true); setError(null);
     try {
-      const loc = LOCATIONS.find((l) => l.label === s.location);
-      const age = AGE_BUCKETS.find((a) => a.label === s.ageBucket);
-      const gender = GENDERS.find((g) => g.label === s.gender);
+      // Location: "Nationwide" (states []) means no state filter — it wins if picked.
+      const selectedLocs = LOCATIONS.filter((l) => s.locations.includes(l.label));
+      const states = selectedLocs.some((l) => l.states.length === 0)
+        ? []
+        : [...new Set(selectedLocs.flatMap((l) => l.states))];
+      // Age: the API takes one min/max range, so several buckets span from the lowest
+      // min to the highest max. "All ages" (null bounds) clears the age filter.
+      const selectedAges = AGE_BUCKETS.filter((a) => s.ageBuckets.includes(a.label));
+      const bounded = selectedAges.filter((a) => a.min != null && a.max != null);
+      const hasAllAges = selectedAges.some((a) => a.min == null);
+      const ageMin = hasAllAges || bounded.length === 0 ? undefined : Math.min(...bounded.map((a) => a.min!));
+      const ageMax = hasAllAges || bounded.length === 0 ? undefined : Math.max(...bounded.map((a) => a.max!));
       await api.put(`/v1/campaigns/${campaignId}/targeting`, {
-        states: loc?.states ?? [],
-        age_min: age?.min ?? undefined,
-        age_max: age?.max ?? undefined,
-        genders: gender?.value ?? [],
-        languages: s.language ? [s.language] : [],
+        states,
+        age_min: ageMin,
+        age_max: ageMax,
+        genders: GENDER_OPTIONS.filter((g) => s.genders.includes(g.label)).map((g) => g.value),
+        languages: s.languages,
         categories: s.categories,
-        platforms: s.platform ? [s.platform] : [],
+        platforms: PLATFORMS.filter((p) => s.platforms.includes(p.label)).map((p) => p.value),
         roles: [s.role],
         // Reach per slot comes from the role's category default — no manual input.
       });
@@ -322,7 +352,53 @@ function NewCampaignInner() {
 
 // ── Steps ──────────────────────────────────────────────────
 
+// Client-facing run-length presets. Picking one sets the end date relative to the
+// start (or today). The promoter's own deadline is set a contingency buffer before
+// the end — that's internal and never shown to the client here.
+const DURATION_PRESETS = [
+  { label: '1 day', days: 1 },
+  { label: '3 days', days: 3 },
+  { label: '1 week', days: 7 },
+  { label: '2 weeks', days: 14 },
+  { label: '1 month', days: 30 },
+];
+
+function todayISO(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+function addDaysISO(iso: string, days: number): string {
+  const d = new Date(`${iso}T00:00:00`);
+  d.setDate(d.getDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+function dayCount(startISO: string, endISO: string): number {
+  const ms = new Date(`${endISO}T00:00:00`).getTime() - new Date(`${startISO}T00:00:00`).getTime();
+  return Math.max(0, Math.round(ms / 86_400_000));
+}
+function fmtShortDate(iso: string): string {
+  return new Date(`${iso}T00:00:00`).toLocaleDateString('en-NG', { day: 'numeric', month: 'short' });
+}
+
+const CADENCE_OPTIONS = [
+  { value: 'ONE_OFF', label: 'Just once', hint: 'A single post.' },
+  { value: 'DAILY', label: 'Every day', hint: 'One post per day of the run.' },
+  { value: 'WEEKLY', label: 'Weekly', hint: 'One post per week.' },
+  { value: 'CUSTOM', label: 'Custom', hint: 'Set the number of posts.' },
+] as const;
+
+/** Posts each promoter delivers, derived from the cadence + run window (mirrors the API). */
+function computePosts(s: Pick<State, 'cadence' | 'startsAt' | 'endsAt' | 'customPosts'>): number {
+  if (s.cadence === 'ONE_OFF' || !s.endsAt) return 1;
+  const start = s.startsAt || todayISO();
+  const days = dayCount(start, s.endsAt);
+  if (s.cadence === 'DAILY') return Math.max(2, days);
+  if (s.cadence === 'WEEKLY') return Math.max(2, Math.ceil(days / 7));
+  return Math.max(2, parseInt(s.customPosts, 10) || 2); // CUSTOM
+}
+
 function Brief({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
+  const start = s.startsAt || todayISO();
+  const runDays = s.startsAt && s.endsAt ? dayCount(s.startsAt, s.endsAt) : s.endsAt ? dayCount(todayISO(), s.endsAt) : 0;
   return (
     <div className="space-y-6">
       <Header title="Write the brief." subtitle="Promoters will see this. Keep it clear — what to say, do and why it matters." />
@@ -347,6 +423,82 @@ function Brief({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
       <Field label="Destination Link">
         <Input value={s.destination_url} onChange={(e) => set({ destination_url: e.target.value })} placeholder="https://" />
       </Field>
+
+      <div>
+        <p className="mb-1 text-[14px] font-semibold text-ink">
+          How long should it run? <span className="font-normal text-muted">(optional)</span>
+        </p>
+        <p className="mb-3 text-[13px] text-muted">
+          Set a run window if this should stay up over several days or weeks. Leave it blank to run on the standard delivery window from approval.
+        </p>
+        <div className="mb-3 flex flex-wrap gap-2">
+          {DURATION_PRESETS.map((d) => {
+            const on = !!s.endsAt && s.endsAt === addDaysISO(start, d.days);
+            return (
+              <button
+                key={d.label}
+                type="button"
+                aria-pressed={on}
+                onClick={() => set({ startsAt: s.startsAt || todayISO(), endsAt: addDaysISO(start, d.days) })}
+                className={`rounded-full px-4 py-2 text-[13.5px] font-semibold transition ${
+                  on ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+                }`}
+              >
+                {d.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          <Field label="Start date">
+            <Input type="date" min={todayISO()} value={s.startsAt} onChange={(e) => set({ startsAt: e.target.value })} />
+          </Field>
+          <Field label="End date">
+            <Input type="date" min={s.startsAt || todayISO()} value={s.endsAt} onChange={(e) => set({ endsAt: e.target.value })} />
+          </Field>
+        </div>
+        {s.endsAt && runDays > 0 && (
+          <p className="mt-2 text-[13px] font-medium text-muted">
+            Runs {fmtShortDate(start)} → {fmtShortDate(s.endsAt)} · {runDays} day{runDays === 1 ? '' : 's'}
+          </p>
+        )}
+      </div>
+
+      {s.endsAt && (
+        <div>
+          <p className="mb-1 text-[14px] font-semibold text-ink">How often should each promoter post?</p>
+          <p className="mb-3 text-[13px] text-muted">
+            Repeating posts sustain reach across the run. Each promoter is paid per post, so a repeating campaign costs more.
+          </p>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {CADENCE_OPTIONS.map((o) => (
+              <SelectCard key={o.value} on={s.cadence === o.value} onClick={() => set({ cadence: o.value })}>
+                <span className="block text-[14px] font-semibold">{o.label}</span>
+                <span className="mt-0.5 block text-[11.5px] text-muted">{o.hint}</span>
+              </SelectCard>
+            ))}
+          </div>
+          {s.cadence === 'CUSTOM' && (
+            <div className="mt-3 max-w-[220px]">
+              <Field label="Number of posts">
+                <Input
+                  type="number"
+                  min={2}
+                  max={90}
+                  value={s.customPosts}
+                  onChange={(e) => set({ customPosts: e.target.value })}
+                  placeholder="e.g. 5"
+                />
+              </Field>
+            </div>
+          )}
+          {s.cadence !== 'ONE_OFF' && (
+            <p className="mt-2 text-[13px] font-medium text-brand-700">
+              ≈ {computePosts(s)} posts per promoter over the run.
+            </p>
+          )}
+        </div>
+      )}
     </div>
   );
 }
@@ -430,46 +582,25 @@ function Assets({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
 }
 
 function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
-  const toggleCategory = (c: string) =>
-    set({ categories: s.categories.includes(c) ? s.categories.filter((x) => x !== c) : [...s.categories, c] });
+  // Every targeting facet is multi-select — toggle a label in/out of its list.
+  const toggle = (key: 'locations' | 'ageBuckets' | 'genders' | 'languages' | 'categories' | 'platforms', v: string) =>
+    set({ [key]: s[key].includes(v) ? s[key].filter((x) => x !== v) : [...s[key], v] } as Partial<State>);
 
   return (
     <div className="space-y-7">
       <div className="flex items-start justify-between gap-4">
-        <Header title="Target the right people." subtitle="The quote on the next screen moves live with every choice you make." />
+        <Header title="Target the right people." subtitle="Pick as many as you like in each row — the quote on the next screen moves live with every choice." />
         <span className="hidden shrink-0 rounded-full border border-rule px-4 py-2 text-[13px] font-semibold text-brand-700 sm:inline-flex">
           📞 Need help? Talk to us
         </span>
       </div>
 
-      <PillGroup label="Location" options={LOCATIONS.map((l) => l.label)} value={s.location} onSelect={(v) => set({ location: v })} />
-      <PillGroup label="Age range" options={AGE_BUCKETS.map((a) => a.label)} value={s.ageBucket} onSelect={(v) => set({ ageBucket: v })} />
-      <PillGroup label="Gender" options={GENDERS.map((g) => g.label)} value={s.gender} onSelect={(v) => set({ gender: v })} />
-      <PillGroup label="Language" options={LANGUAGES} value={s.language} onSelect={(v) => set({ language: v })} />
-
-      <div>
-        <p className="mb-2 text-[15px] font-semibold text-ink">Category of interest</p>
-        <div className="flex flex-wrap gap-2.5">
-          {CATEGORIES.map((c) => {
-            const on = s.categories.includes(c);
-            return (
-              <button
-                key={c}
-                type="button"
-                onClick={() => toggleCategory(c)}
-                className={`rounded-full px-4 py-2 text-[13.5px] font-semibold transition ${
-                  on ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
-                }`}
-              >
-                {on ? '× ' : ''}{c}
-              </button>
-            );
-          })}
-        </div>
-      </div>
-
-      <PillGroup label="Platform" options={PLATFORMS.map((p) => p.label)} value={PLATFORMS.find((p) => p.value === s.platform)?.label ?? ''}
-        onSelect={(label) => set({ platform: PLATFORMS.find((p) => p.label === label)?.value ?? '' })} />
+      <ChipMulti label="Location" options={LOCATIONS.map((l) => l.label)} value={s.locations} onToggle={(v) => toggle('locations', v)} />
+      <ChipMulti label="Age range" options={AGE_BUCKETS.map((a) => a.label)} value={s.ageBuckets} onToggle={(v) => toggle('ageBuckets', v)} />
+      <ChipMulti label="Gender" options={GENDER_OPTIONS.map((g) => g.label)} value={s.genders} onToggle={(v) => toggle('genders', v)} />
+      <ChipMulti label="Language" options={LANGUAGES} value={s.languages} onToggle={(v) => toggle('languages', v)} />
+      <ChipMulti label="Category of interest" options={CATEGORIES} value={s.categories} onToggle={(v) => toggle('categories', v)} />
+      <ChipMulti label="Platform" options={PLATFORMS.map((p) => p.label)} value={s.platforms} onToggle={(v) => toggle('platforms', v)} />
 
       <div>
         <p className="text-[15px] font-semibold text-ink">Who should promote this?</p>
@@ -612,6 +743,11 @@ function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDi
       <div className="mt-3 rounded-3xl border border-rule bg-paper p-6 sm:p-8">
         <p className="text-[14px] text-muted">Estimated price</p>
         <p className="mt-1 text-[44px] font-extrabold leading-none tracking-tight text-brand">{plan.total_price.amount_display}</p>
+        {plan.posts_required > 1 && (
+          <p className="mt-1 text-[13px] font-medium text-muted">
+            {plan.slots} promoter{plan.slots === 1 ? '' : 's'} × {plan.posts_required} posts each
+          </p>
+        )}
 
         <input
           type="range" min={minBudget} max={max} step={unit}
@@ -645,7 +781,7 @@ function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDi
       </div>
 
       <div className="mt-4 rounded-2xl border border-rule bg-wash px-4 py-3 text-[13px] text-muted">
-        ⓘ If we don&apos;t fill every slot, the unspent balance is refunded to your wallet, itemised. You&apos;ll always know exactly what your money bought.
+        ⓘ You only ever pay for verified delivery. Every promoter&apos;s post is reviewed before it counts, and your evidence gallery itemises exactly what your money bought.
       </div>
 
       <div className="mt-5">
@@ -776,10 +912,20 @@ function ChipMulti({ label, options, value, onToggle }: { label: string; options
 
 function hydrateState(prev: State, c: Campaign): State {
   const t = c.targeting;
-  const loc = t ? LOCATIONS.find((l) => JSON.stringify([...l.states].sort()) === JSON.stringify([...(t.states ?? [])].sort())) : undefined;
-  const age = t ? AGE_BUCKETS.find((a) => (a.min ?? null) === (t.age_min ?? null) && (a.max ?? null) === (t.age_max ?? null)) : undefined;
-  const gender = t ? GENDERS.find((g) => JSON.stringify([...g.value].sort()) === JSON.stringify([...(t.genders ?? [])].sort())) : undefined;
-  const platform = t?.platforms?.[0] ? PLATFORMS.find((p) => p.value === t.platforms[0]) : undefined;
+  // Reverse-map the saved targeting arrays back to selected labels (best-effort for
+  // resuming a draft). Location: a bucket is on when all its states are present, or
+  // "Nationwide" when no states are set. Age: match any bucket whose exact bounds are
+  // in the saved range.
+  const tStates = t?.states ?? [];
+  const locations = t
+    ? LOCATIONS.filter((l) => (l.states.length === 0 ? tStates.length === 0 : l.states.every((st) => tStates.includes(st)))).map((l) => l.label)
+    : [];
+  const tGenders = t?.genders ?? [];
+  const genders = GENDER_OPTIONS.filter((g) => tGenders.includes(g.value)).map((g) => g.label);
+  const ageBuckets = t
+    ? AGE_BUCKETS.filter((a) => a.min != null && a.max != null && (t.age_min ?? -1) <= a.min && a.max <= (t.age_max ?? 200)).map((a) => a.label)
+    : [];
+  const platforms = t ? PLATFORMS.filter((p) => (t.platforms ?? []).includes(p.value)).map((p) => p.label) : [];
   const rc = c.role_config ?? {};
   return {
     ...prev,
@@ -787,14 +933,18 @@ function hydrateState(prev: State, c: Campaign): State {
     objective: c.objective ?? 'AWARENESS',
     description: c.description ?? '',
     destination_url: c.destination_url ?? '',
+    startsAt: c.starts_at ? c.starts_at.slice(0, 10) : '',
+    endsAt: c.ends_at ? c.ends_at.slice(0, 10) : '',
+    cadence: c.cadence ?? 'ONE_OFF',
+    customPosts: c.cadence === 'CUSTOM' && c.posts_required ? String(c.posts_required) : '',
     creativeMode: c.needs_creative ? 'DESIGN' : prev.creativeMode,
     designBrief: c.design_brief ?? '',
-    location: loc?.label ?? '',
-    ageBucket: age?.label ?? '',
-    gender: gender?.label ?? '',
-    language: t?.languages?.[0] ?? '',
+    locations,
+    ageBuckets,
+    genders,
+    languages: t?.languages ?? [],
     categories: t?.categories ?? [],
-    platform: platform?.value ?? '',
+    platforms,
     role: t?.roles?.[0] ?? '',
     contentType: rc.content_type ?? '',
     taskMode: (rc.task_mode as State['taskMode']) ?? '',

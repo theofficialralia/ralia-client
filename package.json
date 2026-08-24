@@ -9,7 +9,8 @@
     "start": "next start -p 6300",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "gen:api": "openapi-typescript api-contract/openapi.json -o lib/api-types.ts"
+    "gen:api": "openapi-typescript api-contract/openapi.json -o lib/api-types.ts",
+    "start:prod": "node server.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.1",
@@ -29,5 +30,8 @@
     "postcss": "^8.4.49",
     "tailwindcss": "^3.4.17",
     "typescript": "^5.7.2"
+  },
+  "engines": {
+    "node": ">=20"
   }
 }
