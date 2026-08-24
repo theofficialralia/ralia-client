@@ -1,88 +1,108 @@
-# Ralia — Client (business) web app
+<div align="center">
 
-The business-facing web app for Ralia: a two-sided marketplace where businesses
-fund campaigns and promoters post them for a fee. This repo is the **Client**
-app only. The API lives in a separate repo (`ralia-api`); the promoter and admin
-apps are not designed yet.
+# 🧑‍💼 Ralia for Business
 
-Nothing is built here yet — this repo is seeded with the designs and the frozen
-API contract so UI work can begin against a fixed target.
+### Book real reach. Pay for verified results.
 
-## Layout
+<br/>
 
+![Next.js](https://img.shields.io/badge/Next.js-15-000000?style=for-the-badge&logo=nextdotjs&logoColor=white)
+![React](https://img.shields.io/badge/React-19-61DAFB?style=for-the-badge&logo=react&logoColor=black)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?style=for-the-badge&logo=typescript&logoColor=white)
+![Tailwind](https://img.shields.io/badge/Tailwind-3-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)
+![TanStack Query](https://img.shields.io/badge/TanStack_Query-5-FF4154?style=for-the-badge&logo=reactquery&logoColor=white)
+
+![Port](https://img.shields.io/badge/dev_port-6300-E11D48?style=flat-square)
+
+</div>
+
+---
+
+The **client** app is where a business launches a campaign, watches it fill with promoters, and
+reviews the **verified** proof of every post it paid for. It's a Next.js app that proxies the API
+server-side — so the browser is always same-origin and there's **no CORS to manage**.
+
+## 🎯 Create-campaign wizard
+
+```mermaid
+flowchart LR
+    A["📝 Brief<br/>name · objective · link<br/>run window · cadence"] --> B["🎨 Assets<br/>upload or ask Ralia"]
+    B --> C["🎯 Targeting<br/>multi-select: location, age,<br/>gender, language, category, platform"]
+    C --> D["💵 Live quote<br/>slider · slots × posts"]
+    D --> E["🔒 Fund<br/>escrow → LIVE"]
+
+    classDef s fill:#fff1f2,stroke:#E11D48,color:#881337;
+    class A,B,C,D,E s;
 ```
-designs/            The 17 client screens (PNG), from the designer.
-api-contract/       openapi.json — the frozen API contract, copied from ralia-api.
-                    Regenerate in ralia-api with `make openapi` and copy it here
-                    when the API surface changes.
+
+- **Multi-day campaigns** — pick a run window and a cadence (one-off, daily, weekly, or a custom
+  number of posts). The quote scales with posts, so pricing is always honest.
+- **Multi-select targeting** — target several states, ages, languages, categories and platforms at
+  once; the live quote moves with every choice.
+
+## 🖼️ Evidence gallery
+
+Every approved post shows up as a screenshot card — filterable by platform, zoomable, with the
+verified view count. The client **only ever sees approved work**: nothing appears until an admin
+has verified it.
+
+```mermaid
+flowchart LR
+    P[📣 Promoter posts] --> Adm{🛡️ Admin verifies}
+    Adm -->|approved| G[🖼️ Evidence gallery]
+    Adm -->|rejected| X[❌ never shown to client]
+    classDef ok fill:#dcfce7,stroke:#16a34a,color:#14532d;
+    class G ok;
 ```
 
-## Build against the contract, not against your memory of it
+## 🧭 How it talks to the API
 
-Every screen maps to endpoints in `api-contract/openapi.json`. Browse it at
-<https://editor.swagger.io> (File → Import file), or run the API locally
-(`make up` in ralia-api) and open <http://localhost:3000/docs>.
+```mermaid
+flowchart LR
+    Browser -->|same-origin| Next[Next.js server]
+    Next -->|"/v1/* · /r/* rewrite"| API[(Ralia API)]
+```
 
-Money is always integer **kobo** in the API. A field is `{ amount_minor: 603750,
-amount_display: "₦6,037.50" }` — render `amount_display`, never do currency math
-in the browser.
+`next.config.mjs` rewrites `/v1` and `/r` to `API_ORIGIN` on the server — set it to the deployed
+API URL in production.
 
-## Read this before implementing the designs literally
+## 🚀 Quickstart
 
-The designs were drawn ahead of the backend and, in several places, assume a
-**different product** than the one that was scoped and built. Implementing them
-1:1 would build features that are explicitly out of scope, or that the API does
-not support. Resolve each of these with the client before building the screen.
+```bash
+npm install
+cp .env.example .env     # set API_ORIGIN (defaults to http://localhost:6100)
+npm run dev              # http://localhost:6300
+```
 
-### Scope conflicts — do not build as drawn
+Seeded logins: `client1@ralia.test` / `client2@ralia.test` · password `Password123!`
 
-1. **Self-service card payments are out of scope.** The create-campaign flow ends
-   in a "Fund the campaign" step with card / USSD / bank transfer, "settles
-   instantly", and a Paystack card form. The SOW excludes payment gateways and
-   card checkout — **money is admin-recorded**. The real flow: the client submits
-   a campaign, an admin approves it, the client sends a bank transfer out of band,
-   and an admin records it (`POST /admin/campaigns/{id}/fund`). There is no
-   client-facing payment endpoint. Building the Paystack step is a paid change
-   order, and it pulls the product into PCI-DSS scope. **Settle this first.**
+<details>
+<summary><b>🔐 Environment</b></summary>
 
-2. **OTP goes to the phone, not email.** The Verify screen shows an email OTP. The
-   API sends the OTP to the WhatsApp/phone number captured at registration
-   (`/auth/otp/request`, `/auth/otp/verify` take `phone_e164`). Either re-point
-   the screen to phone/WhatsApp, or add email verification to the API — today it
-   is phone-only.
+| Variable | Purpose |
+|---|---|
+| `API_ORIGIN` | The API origin the Next server proxies `/v1` + `/r` to |
+| `NODE_ENV` | `production` in deploys |
+</details>
 
-3. **No prepaid wallet.** The dashboard shows a fundable "Wallet balance" spent
-   across campaigns. The API funds **per campaign** (one escrow per campaign),
-   with no cross-campaign wallet. Either drop the wallet concept from the UI or
-   add a wallet model to the API.
+<details>
+<summary><b>🛠️ Scripts</b></summary>
 
-### API work these screens need that is not built yet
+| Script | Does |
+|---|---|
+| `dev` | dev server on :6300 |
+| `build` | production build |
+| `start:prod` | `node server.js` (Hostinger hPanel) |
+| `typecheck` | `tsc --noEmit` |
+</details>
 
-4. **Campaign analytics + report export** (views delivered, acceptance rate,
-   cost-per-view, "Export report") — the analytics endpoint is deferred and there
-   is no export. Needed for the campaign-detail screen.
+## 🚢 Deployment
 
-5. **Pause campaign** — the Pause button needs an endpoint; the `PAUSED` status
-   exists but the transition is not exposed yet.
+Deploys to **Hostinger hPanel** (Node.js app) via the bundled `server.js` startup file. See the
+workspace `DEPLOY.md`.
 
-### Unit economics
+---
 
-6. The mockups assume ~₦250,000 campaigns (~₦4/view). The API's default pricing
-   (RPM ₦30 per 1,000 views) produces campaigns ~30× smaller. The RPM is config;
-   set it to the real economics before the Quote screen goes in front of anyone.
-
-### Copy / content fixes (carry into implementation)
-
-- "Procced" → "Proceed" (several buttons).
-- "At lease 8 characters" → "At least" — and the API minimum is **10**, not 8.
-- The ₦ sign renders as `#` in the testimonial's italic font; pick a font with
-  the glyph or embed it.
-- The register screen collects "Full name" for a business; the API's client model
-  has no such field (a client is an organisation).
-- Terms and privacy are one checkbox; the API records consent per purpose and
-  wants each individually revocable — prefer two.
-
-## Stack
-
-Not chosen yet. The design brief calls for a mobile-first, component-library-level
-build. Pick the framework when frontend work is scheduled.
+<div align="center">
+<sub>Part of Ralia · <a href="../ralia-api">API</a> · <a href="../ralia-admin">Admin</a> · <a href="../ralia-promoter">Promoter</a></sub>
+</div>
