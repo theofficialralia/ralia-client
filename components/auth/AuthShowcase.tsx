@@ -12,20 +12,19 @@ type Slide = { image: string; quote: string; highlight?: string; author?: string
  */
 const SLIDES: Slide[] = [
   {
-    image: '/onboarding/slide-1.svg',
+    image: '/onboarding/slide-1.jpg',
     quote: 'The gallery is the thing. We ran ₦180,000 through Ralia and I could point at every screenshot.',
     highlight: 'My board approved the next quarter’s budget from that grid alone.',
-    author: '— Amara O., Skinsmith',
   },
   {
-    image: '/onboarding/slide-2.svg',
-    quote: 'We reached 2.4M real people in a week — and paid only for posts that actually went live.',
-    author: '— Tunde A., NaijaThreads',
+    image: '/onboarding/slide-2.jpg',
+    quote: 'We launched our skincare line through Ralia and reached over 120,000 people in just five days.',
+    highlight: 'The quality of promoters exceeded our expectations.',
   },
   {
-    image: '/onboarding/slide-3.svg',
-    quote: 'No agencies, no guesswork. Set a budget, pick the audience, watch verified proof roll in.',
-    author: '— Zainab M., Kaduna Foods',
+    image: '/onboarding/slide-3.jpg',
+    quote: 'Instead of spending weeks looking for influencers, we had dozens of qualified promoters ready within minutes.',
+    highlight: 'Our opening weekend sold out.',
   },
 ];
 

@@ -10,28 +10,38 @@ const ArrowUpRight = () => (
 );
 
 function PathCard({ title, accent, body, href }: { title: string; accent: string; body: string; href: string }) {
+  // The promoter path lives on a different origin (the promoter app), so it must be
+  // a real anchor doing a full cross-domain navigation, not a client-side <Link>.
+  const external = /^https?:\/\//.test(href);
+  const cta = 'mt-5 inline-flex items-center gap-2 self-start rounded-full bg-sidebar py-2 pl-4 pr-2 text-[13px] font-semibold text-white transition hover:opacity-90';
+  const inner = (
+    <>
+      Proceed
+      <span className="grid h-6 w-6 place-items-center rounded-full bg-brand">
+        <ArrowUpRight />
+      </span>
+    </>
+  );
   return (
     <div className="card flex flex-col p-5">
       <h3 className="text-[17px] font-bold text-ink">
         {title} <span className="text-brand">{accent}</span>
       </h3>
       <p className="mt-2 flex-1 text-[13.5px] leading-relaxed text-muted">{body}</p>
-      <Link
-        href={href}
-        className="mt-5 inline-flex items-center gap-2 self-start rounded-full bg-sidebar py-2 pl-4 pr-2 text-[13px] font-semibold text-white transition hover:opacity-90"
-      >
-        Proceed
-        <span className="grid h-6 w-6 place-items-center rounded-full bg-brand">
-          <ArrowUpRight />
-        </span>
-      </Link>
+      {external ? (
+        <a href={href} className={cta}>{inner}</a>
+      ) : (
+        <Link href={href} className={cta}>{inner}</Link>
+      )}
     </div>
   );
 }
 
-// The promoter signup lives in the separate promoter app. In dev that's :6400;
-// set NEXT_PUBLIC_PROMOTER_URL per environment.
-const PROMOTER_URL = process.env.NEXT_PUBLIC_PROMOTER_URL ?? 'http://localhost:6400';
+// The promoter signup lives in the separate promoter app (its own origin). Set
+// NEXT_PUBLIC_PROMOTER_URL per environment — e.g. https://dev-promoter.ralia.co —
+// falling back to :6400 for local dev. Trailing slash trimmed so `${url}/register`
+// never doubles up.
+const PROMOTER_URL = (process.env.NEXT_PUBLIC_PROMOTER_URL ?? 'http://localhost:6400').replace(/\/+$/, '');
 
 export default function ChoosePage() {
   return (
