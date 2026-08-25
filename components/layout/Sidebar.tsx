@@ -31,7 +31,49 @@ function profileCompleteness(p: ClientProfile): number {
   return Math.round((checks.filter(Boolean).length / checks.length) * 100);
 }
 
-export function Sidebar({ collapsed = false, onToggleCollapse }: { collapsed?: boolean; onToggleCollapse?: () => void }) {
+export function Sidebar({
+  collapsed = false,
+  onToggleCollapse,
+  mobileOpen = false,
+  onMobileClose,
+}: {
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+  mobileOpen?: boolean;
+  onMobileClose?: () => void;
+}) {
+  return (
+    <>
+      {/* Desktop: persistent, collapsible rail */}
+      <aside className={`hidden shrink-0 flex-col border-r border-rule bg-sidebar text-white transition-[width] duration-200 lg:flex ${collapsed ? 'w-[76px]' : 'w-[260px]'}`}>
+        <SidebarPanel collapsed={collapsed} onToggleCollapse={onToggleCollapse} />
+      </aside>
+
+      {/* Mobile: off-canvas drawer + backdrop */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-40 lg:hidden">
+          <div className="absolute inset-0 bg-black/50 backdrop-blur-sm animate-fade-in" onClick={onMobileClose} />
+          <aside className="absolute inset-y-0 left-0 flex w-[280px] max-w-[85%] flex-col bg-sidebar text-white shadow-2xl">
+            <SidebarPanel collapsed={false} mobile onMobileClose={onMobileClose} />
+          </aside>
+        </div>
+      )}
+    </>
+  );
+}
+
+/** The sidebar's inner content, shared by the desktop rail and the mobile drawer. */
+function SidebarPanel({
+  collapsed = false,
+  onToggleCollapse,
+  mobile = false,
+  onMobileClose,
+}: {
+  collapsed?: boolean;
+  onToggleCollapse?: () => void;
+  mobile?: boolean;
+  onMobileClose?: () => void;
+}) {
   const pathname = usePathname();
   const { user, logout } = useAuth();
   // Shares the ['client-profile'] cache with Settings, so it's deduped.
@@ -43,10 +85,18 @@ export function Sidebar({ collapsed = false, onToggleCollapse }: { collapsed?: b
   const orgName = profile.data?.name ?? user?.email?.split('@')[0] ?? 'Account';
 
   return (
-    <aside className={`flex shrink-0 flex-col border-r border-rule bg-sidebar text-white transition-[width] duration-200 ${collapsed ? 'w-[76px]' : 'w-[260px]'}`}>
+    <>
       <div className={`flex items-center justify-between py-6 ${collapsed ? 'px-3' : 'px-5'}`}>
         {collapsed ? <LogoMark className="h-8 w-8" /> : <Logo label="Businesses" className="[&_div]:text-white [&_.text-muted]:text-white/50" />}
-        {onToggleCollapse && (
+        {mobile ? (
+          <button
+            onClick={onMobileClose}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-white/45 transition hover:bg-white/10 hover:text-white"
+            aria-label="Close menu"
+          >
+            <CloseIcon />
+          </button>
+        ) : onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
             className={`flex h-8 w-8 items-center justify-center rounded-lg text-white/45 transition hover:bg-white/10 hover:text-white ${collapsed ? 'hidden' : ''}`}
@@ -126,7 +176,15 @@ export function Sidebar({ collapsed = false, onToggleCollapse }: { collapsed?: b
           </div>
         )}
       </Link>
-    </aside>
+    </>
+  );
+}
+
+function CloseIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M18 6 6 18M6 6l12 12" />
+    </svg>
   );
 }
 

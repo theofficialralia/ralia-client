@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { usePathname } from 'next/navigation';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { NotificationBell } from '@/components/layout/NotificationBell';
 import { Sidebar } from '@/components/layout/Sidebar';
@@ -15,6 +16,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { loading, user } = useRequireAuth();
   const { user: current } = useAuth();
   const [collapsed, setCollapsed] = useState(false);
+  const [mobileNav, setMobileNav] = useState(false);
+  const pathname = usePathname();
+  // Close the mobile drawer whenever navigation happens.
+  useEffect(() => { setMobileNav(false); }, [pathname]);
   const profile = useQuery({ queryKey: ['client-profile'], queryFn: () => api.get<ClientProfile>('/v1/clients/me'), enabled: !!user });
   const orgName = profile.data?.name ?? current?.email?.split('@')[0] ?? 'Account';
 
@@ -28,9 +33,21 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen bg-wash">
-      <Sidebar collapsed={collapsed} onToggleCollapse={() => setCollapsed((c) => !c)} />
+      <Sidebar
+        collapsed={collapsed}
+        onToggleCollapse={() => setCollapsed((c) => !c)}
+        mobileOpen={mobileNav}
+        onMobileClose={() => setMobileNav(false)}
+      />
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="sticky top-0 z-10 flex items-center gap-4 border-b border-rule bg-wash/80 px-6 py-4 backdrop-blur">
+        <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-rule bg-wash/80 px-4 py-3 backdrop-blur sm:gap-4 sm:px-6 sm:py-4">
+          <button
+            onClick={() => setMobileNav(true)}
+            className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-rule bg-paper text-ink lg:hidden"
+            aria-label="Open menu"
+          >
+            <MenuIcon />
+          </button>
           <div className="relative hidden max-w-lg flex-1 sm:block">
             <SearchIcon />
             <input
@@ -38,7 +55,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
               className="w-full rounded-full border border-rule bg-paper py-2.5 pl-11 pr-4 text-[14px] outline-none focus:border-brand focus:ring-4 focus:ring-brand/10"
             />
           </div>
-          <div className="ml-auto flex items-center gap-3">
+          <div className="ml-auto flex items-center gap-2 sm:gap-3">
             <NotificationBell />
             <ThemeToggle />
             <div className="hidden items-center gap-2 sm:flex">
@@ -49,12 +66,12 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </div>
             <Link href="/campaigns/new">
               <Button size="md">
-                <span className="text-lg leading-none">+</span> New campaign
+                <span className="text-lg leading-none">+</span> <span className="hidden sm:inline">New campaign</span>
               </Button>
             </Link>
           </div>
         </header>
-        <main className="flex-1 px-6 py-6">{children}</main>
+        <main className="flex-1 px-4 py-5 sm:px-6 sm:py-6">{children}</main>
       </div>
     </div>
   );
@@ -67,6 +84,14 @@ function SearchIcon() {
       width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
     >
       <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
+    </svg>
+  );
+}
+
+function MenuIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+      <path d="M4 6h16M4 12h16M4 18h16" />
     </svg>
   );
 }
