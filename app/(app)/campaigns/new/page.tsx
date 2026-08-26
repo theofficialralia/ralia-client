@@ -258,13 +258,14 @@ function NewCampaignInner() {
     }
   }
 
-  // Lock in the plan the slider settled on: save the slot count, then freeze the price.
-  async function commitPlan(slots: number) {
+  // Lock in the exact price the client chose: quote freezes that amount as-is and
+  // derives the promoter count from it (governing logic #2 — the price is charged
+  // as typed, nothing is snapped).
+  async function commitPlan(priceMinor: number) {
     if (!campaignId) return;
     setBusy(true); setError(null);
     try {
-      await api.patch(`/v1/campaigns/${campaignId}`, { slots_total: slots });
-      const q = await api.post<Quote>(`/v1/campaigns/${campaignId}/quote`);
+      const q = await api.post<Quote>(`/v1/campaigns/${campaignId}/quote`, { price_minor: priceMinor });
       setQuote(q);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not lock in the plan.');
@@ -328,7 +329,7 @@ function NewCampaignInner() {
         {step === 1 && <Brief s={s} set={set} />}
         {step === 2 && <Assets s={s} set={set} />}
         {step === 3 && <Targeting s={s} set={set} />}
-        {step === 4 && campaignId && <QuoteStep campaignId={campaignId} initialSlots={PLACEHOLDER_SLOTS} quote={quote} committing={busy} onCommit={commitPlan} onDirty={() => setQuote(null)} />}
+        {step === 4 && campaignId && <QuoteStep campaignId={campaignId} quote={quote} committing={busy} onCommit={commitPlan} onDirty={() => setQuote(null)} />}
         {step === 5 && <Fund quote={quote} />}
 
         {error && (
@@ -679,70 +680,85 @@ function RoleConfigPanel({ s, set }: { s: State; set: (p: Partial<State>) => voi
 
 const MAX_BUDGET_MINOR = 500_000_000; // ₦5,000,000
 
-function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDirty }: {
-  campaignId: string; initialSlots: number; quote: Quote | null; committing: boolean;
-  onCommit: (slots: number) => void; onDirty: () => void;
+/** Instant client-side naira from kobo — the price is exact, so the headline never waits on the server. */
+function nairaFromMinor(minor: number): string {
+  return `₦${Math.round(minor / 100).toLocaleString('en-NG')}`;
+}
+
+function QuoteStep({ campaignId, quote, committing, onCommit, onDirty }: {
+  campaignId: string; quote: Quote | null; committing: boolean;
+  onCommit: (priceMinor: number) => void; onDirty: () => void;
 }) {
   const [plan, setPlan] = useState<CampaignPlan | null>(null);
-  const [budget, setBudget] = useState<number | null>(null);
+  // The exact price the client is spending, in kobo — updated instantly on every
+  // slider tick so the headline is smooth; the server only re-derives promoters/reach.
+  const [price, setPrice] = useState<number | null>(null);
   const [custom, setCustom] = useState('');
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
+  // Initial plan establishes the category floor + defaults and seeds the starting price.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const p = await api.post<CampaignPlan>(`/v1/campaigns/${campaignId}/plan`, { slots: initialSlots });
+        const p = await api.post<CampaignPlan>(`/v1/campaigns/${campaignId}/plan`, {});
         if (!cancelled) {
           setPlan(p);
-          const floorBudget = p.min_slots * p.unit_price.amount_minor;
-          setBudget(Math.max(p.total_price.amount_minor || p.unit_price.amount_minor, floorBudget));
+          setPrice((cur) => cur ?? Math.max(p.floor_minor.amount_minor, p.total_price.amount_minor || p.floor_minor.amount_minor));
         }
       } catch (e) { if (!cancelled) setErr(e instanceof ApiError ? e.message : 'Could not price the campaign.'); }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, [campaignId, initialSlots]);
+  }, [campaignId]);
 
+  // Debounced: re-derive the promoter count + reach for the chosen price. The price
+  // itself is already known locally, so the big number never blocks on this.
   useEffect(() => {
-    if (budget == null) return;
+    if (price == null) return;
     const t = setTimeout(async () => {
-      try { setPlan(await api.post<CampaignPlan>(`/v1/campaigns/${campaignId}/plan`, { budget_minor: budget })); }
+      try { setPlan(await api.post<CampaignPlan>(`/v1/campaigns/${campaignId}/plan`, { price_minor: price })); }
       catch { /* keep the last good plan */ }
-    }, 220);
+    }, 200);
     return () => clearTimeout(t);
-  }, [budget, campaignId]);
+  }, [price, campaignId]);
 
-  if (loading || !plan) {
+  if (loading || !plan || price == null) {
     return (
       <div>
-        <Header title="Your live quote." subtitle="Change any filter and this number moves. This is the honest one." />
+        <Header title="Set your budget." subtitle="Name your price — we show exactly how many promoters and how much reach it buys." />
         <div className="py-10 text-center text-muted">{err ?? 'Pricing your campaign…'}</div>
       </div>
     );
   }
 
-  const unit = plan.unit_price.amount_minor;
-  const minBudget = plan.min_slots * unit;
-  const max = Math.max(MAX_BUDGET_MINOR, minBudget);
-  const value = Math.min(Math.max(budget ?? minBudget, minBudget), max);
-  const locked = quote != null && quote.slots_total === plan.slots;
+  const floor = plan.floor_minor.amount_minor;
+  const max = Math.max(MAX_BUDGET_MINOR, floor);
+  const value = Math.min(Math.max(price, floor), max);
+  const meetsFloor = value >= floor;
+  // Step by roughly one promoter's worth so each notch is meaningful.
+  const stepMinor = Math.max(100, Math.round(floor / Math.max(1, plan.default_promoters)));
+  const locked = quote != null && quote.price.amount_minor === value;
+
+  function setPriceClamped(minor: number) {
+    if (quote) onDirty();
+    setPrice(Math.min(Math.max(minor, floor), max));
+  }
 
   function applyCustom() {
     const naira = Number(custom.replace(/[^0-9]/g, ''));
     if (!naira) return;
-    if (quote) onDirty();
-    setBudget(Math.min(Math.max(naira * 100, minBudget), max));
+    setPriceClamped(naira * 100);
   }
 
   return (
     <div>
-      <Header title="Your live quote." subtitle="Change any filter and this number moves. This is the honest one." />
+      <Header title="Set your budget." subtitle="Name your price — we show exactly how many promoters and how much reach it buys." />
 
       <div className="mt-3 rounded-3xl border border-rule bg-paper p-6 sm:p-8">
-        <p className="text-[14px] text-muted">Estimated price</p>
-        <p className="mt-1 text-[44px] font-extrabold leading-none tracking-tight text-brand">{plan.total_price.amount_display}</p>
+        <p className="text-[14px] text-muted">You&apos;ll spend</p>
+        <p className="mt-1 text-[44px] font-extrabold leading-none tracking-tight text-brand">{nairaFromMinor(value)}</p>
         {plan.posts_required > 1 && (
           <p className="mt-1 text-[13px] font-medium text-muted">
             {plan.slots} promoter{plan.slots === 1 ? '' : 's'} × {plan.posts_required} posts each
@@ -750,9 +766,9 @@ function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDi
         )}
 
         <input
-          type="range" min={minBudget} max={max} step={unit}
+          type="range" min={floor} max={max} step={stepMinor}
           value={value}
-          onChange={(e) => { if (quote) onDirty(); setBudget(Number(e.target.value)); }}
+          onChange={(e) => setPriceClamped(Number(e.target.value))}
           className="mt-5 w-full accent-brand"
         />
         <div className="flex justify-between text-[12px] text-muted">
@@ -760,7 +776,7 @@ function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDi
         </div>
 
         <div className="mt-5">
-          <p className="mb-1.5 text-[14px] font-semibold text-ink">Custom price</p>
+          <p className="mb-1.5 text-[14px] font-semibold text-ink">Or enter an exact amount</p>
           <div className="flex gap-2">
             <Input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="e.g ₦50,000" />
             <Button variant="secondary" onClick={applyCustom}>Set</Button>
@@ -790,8 +806,8 @@ function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDi
             ✓ Locked in at {quote!.price.amount_display} — proceed to payment.
           </div>
         ) : (
-          <Button className="w-full" loading={committing} disabled={!plan.meets_floor} onClick={() => onCommit(plan.slots)}>
-            {!plan.meets_floor ? `Minimum is ${plan.floor_minor.amount_display}` : `Lock in ${plan.slots} slots`}
+          <Button className="w-full" loading={committing} disabled={!meetsFloor} onClick={() => onCommit(value)}>
+            {!meetsFloor ? `Minimum is ${plan.floor_minor.amount_display}` : `Lock in ${nairaFromMinor(value)}`}
           </Button>
         )}
       </div>
