@@ -144,7 +144,7 @@ export default function SetupPage() {
                   aria-pressed={on}
                   onClick={() => toggle(sc.value)}
                   className={`rounded-full px-5 py-2 text-[14px] font-semibold transition ${
-                    on ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+                    on ? 'bg-ink text-paper' : 'border border-rule bg-paper text-ink hover:border-ink/30'
                   }`}
                 >
                   {sc.label}

@@ -150,7 +150,12 @@ function NewCampaignInner() {
 
   async function saveBrief() {
     if (!s.name.trim()) return setError('Give your campaign a name.');
-    if (!/^https?:\/\//.test(s.destination_url)) return setError('Enter a valid destination link (https://…).');
+    // A destination link is where clicks go — required for every objective except
+    // Visibility (Awareness), which is views-only. If given, it must be a valid URL.
+    const needsDestination = s.objective !== 'AWARENESS';
+    const hasDestination = /^https?:\/\//.test(s.destination_url);
+    if (needsDestination && !hasDestination) return setError('Enter a valid destination link (https://…).');
+    if (s.destination_url.trim() && !hasDestination) return setError('That destination link isn’t a valid URL (https://…).');
     if (s.startsAt && s.endsAt && s.endsAt <= s.startsAt) return setError('The end date must be after the start date.');
     if (s.cadence !== 'ONE_OFF' && !s.endsAt) return setError('Set an end date before choosing a repeating schedule.');
     setBusy(true); setError(null);
@@ -159,7 +164,7 @@ function NewCampaignInner() {
         name: s.name.trim(),
         objective: s.objective,
         description: s.description || undefined,
-        destination_url: s.destination_url,
+        destination_url: hasDestination ? s.destination_url : null,
         slots_total: PLACEHOLDER_SLOTS,
         // Nulls explicitly clear a previously-set window on a resumed draft.
         starts_at: s.startsAt || null,
@@ -395,8 +400,11 @@ function Brief({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
       <Field label="Description">
         <Textarea value={s.description} onChange={(e) => set({ description: e.target.value })} placeholder="What is this campaign about, and who is it for?" />
       </Field>
-      <Field label="Destination Link">
+      <Field label={s.objective === 'AWARENESS' ? 'Destination Link (optional)' : 'Destination Link'}>
         <Input value={s.destination_url} onChange={(e) => set({ destination_url: e.target.value })} placeholder="https://" />
+        {s.objective === 'AWARENESS' && (
+          <p className="mt-1 text-[12px] text-muted">Visibility campaigns are views-only — add a link only if you want clicks tracked.</p>
+        )}
       </Field>
 
       <div>
@@ -416,7 +424,7 @@ function Brief({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
                 aria-pressed={on}
                 onClick={() => set({ startsAt: s.startsAt || todayISO(), endsAt: addDaysISO(start, d.days) })}
                 className={`rounded-full px-4 py-2 text-[13.5px] font-semibold transition ${
-                  on ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+                  on ? 'bg-ink text-paper' : 'border border-rule bg-paper text-ink hover:border-ink/30'
                 }`}
               >
                 {d.label}
@@ -575,7 +583,7 @@ function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
       <ChipMulti label="Gender" options={GENDER_OPTIONS.map((g) => g.label)} value={s.genders} onToggle={(v) => toggle('genders', v)} />
       <ChipMulti label="Language" options={LANGUAGES} value={s.languages} onToggle={(v) => toggle('languages', v)} />
       <ChipMulti label="Category of interest" options={CATEGORIES} value={s.categories} onToggle={(v) => toggle('categories', v)} />
-      <ChipMulti label="Platform" options={PLATFORMS.map((p) => p.label)} value={s.platforms} onToggle={(v) => toggle('platforms', v)} />
+      <ChipMulti label="Where should they promote this?" options={PLATFORMS.map((p) => p.label)} value={s.platforms} onToggle={(v) => toggle('platforms', v)} />
 
       <div>
         <p className="text-[15px] font-semibold text-ink">Who should promote this?</p>
@@ -589,7 +597,7 @@ function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
                 type="button"
                 onClick={() => set({ role: r.value })}
                 className={`rounded-2xl border p-5 text-left transition ${
-                  on ? 'border-ink bg-ink text-white' : 'border-rule bg-paper hover:border-ink/30'
+                  on ? 'border-ink bg-ink text-paper' : 'border-rule bg-paper hover:border-ink/30'
                 }`}
               >
                 <div className="text-[16px] font-bold">
@@ -811,7 +819,7 @@ function PillGroup({ label, options, value, onSelect }: { label: string; options
             type="button"
             onClick={() => onSelect(o === value ? '' : o)}
             className={`rounded-full px-5 py-2 text-[14px] font-semibold transition ${
-              value === o ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+              value === o ? 'bg-ink text-paper' : 'border border-rule bg-paper text-ink hover:border-ink/30'
             }`}
           >
             {o}
@@ -828,7 +836,7 @@ function SelectCard({ on, onClick, children }: { on: boolean; onClick: () => voi
       type="button"
       onClick={onClick}
       className={`rounded-2xl px-4 py-3.5 text-[14px] font-semibold transition ${
-        on ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+        on ? 'bg-ink text-paper' : 'border border-rule bg-paper text-ink hover:border-ink/30'
       }`}
     >
       {children}
@@ -869,7 +877,7 @@ function ChipMulti({ label, options, value, onToggle }: { label: string; options
               type="button"
               onClick={() => onToggle(o)}
               className={`rounded-full px-4 py-2 text-[13px] font-semibold transition ${
-                on ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+                on ? 'bg-ink text-paper' : 'border border-rule bg-paper text-ink hover:border-ink/30'
               }`}
             >
               {on ? '× ' : ''}{o}

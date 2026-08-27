@@ -52,7 +52,7 @@ export default function RegisterPage() {
         },
         { auth: false },
       );
-      router.push(`/verify?phone=${encodeURIComponent(values.phone_e164)}`);
+      router.push(`/verify?phone=${encodeURIComponent(values.phone_e164)}&email=${encodeURIComponent(values.email)}`);
     } catch (e) {
       setServerError(e instanceof ApiError ? e.message : 'Something went wrong. Try again.');
     }

@@ -127,6 +127,7 @@ export type ClientProfile = {
   support_contact_phone: string | null;
   description: string | null;
   socials: ClientSocial[] | null;
+  logo_url: string | null;
   status: string;
 };
 

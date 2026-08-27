@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { StatusPill } from '@/components/ui/StatusPill';
+import { objectiveLabel } from '@/lib/campaign-options';
 import type { DashboardRow } from '@/lib/api';
 
 /**
@@ -46,7 +47,7 @@ export function CampaignsTable({ rows, empty }: { rows: DashboardRow[]; empty?: 
                 <tr key={c.id} className="border-b border-rule/70 last:border-0 hover:bg-wash/60">
                   <td className="px-6 py-4">
                     <div className="font-semibold text-ink">{c.name}</div>
-                    <div className="text-[12.5px] capitalize text-muted">{c.objective.toLowerCase().replace('_', ' ')} · {c.slots_total} slots</div>
+                    <div className="text-[12.5px] text-muted">{objectiveLabel(c.objective)} · {c.slots_total} slots</div>
                   </td>
                   <td className="px-4 py-4"><StatusPill status={c.status} /></td>
                   <td className="px-4 py-4">

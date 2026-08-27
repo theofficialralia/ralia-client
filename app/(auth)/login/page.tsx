@@ -37,7 +37,7 @@ export default function LoginPage() {
       router.replace('/dashboard');
     } catch (e) {
       if (e instanceof ApiError && e.code === 'PHONE_NOT_VERIFIED') {
-        setServerError('Verify your number to continue.');
+        setServerError('Verify your email to continue.');
       } else {
         setServerError(e instanceof ApiError ? e.message : 'Could not sign you in.');
       }

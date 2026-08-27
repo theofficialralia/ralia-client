@@ -8,7 +8,8 @@ import { api, ApiError, uuid, type CampaignAnalytics, type EvidenceItem } from '
 import type { Money } from '@/lib/money';
 import { useAuth } from '@/lib/auth';
 import { loadPaystack, PAYSTACK_PUBLIC_KEY, paystackConfigured } from '@/lib/paystack';
-import { platformLabel, timeAgo, titleCase } from '@/lib/format';
+import { platformLabel, timeAgo } from '@/lib/format';
+import { objectiveLabel } from '@/lib/campaign-options';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
@@ -65,7 +66,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
       <div className="mt-6 flex items-center gap-3">
         <StatusPill status={data.status} />
         <span className="text-[13.5px] text-muted">
-          {titleCase(data.objective)}
+          {objectiveLabel(data.objective)}
           {data.launched_at && ` · Launched ${new Date(data.launched_at).toLocaleDateString('en-CA')}`}
         </span>
       </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { api, ApiError, type ClientProfile, type ClientSocial } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, Textarea } from '@/components/ui/Field';
@@ -42,6 +42,22 @@ export function BusinessDetailsTab({ profile, onSaved }: { profile: ClientProfil
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
+  const logoInput = useRef<HTMLInputElement>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+
+  async function uploadLogo(file: File) {
+    setError(null); setUploadingLogo(true);
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      await api.postForm<ClientProfile>('/v1/clients/me/logo', form);
+      onSaved(); // refetch the profile so the new logo shows
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not upload the logo.');
+    } finally {
+      setUploadingLogo(false);
+    }
+  }
 
   const set = (patch: Partial<typeof f>) => {
     setF((prev) => ({ ...prev, ...patch }));
@@ -81,17 +97,28 @@ export function BusinessDetailsTab({ profile, onSaved }: { profile: ClientProfil
       {/* Identity card */}
       <section className="card p-6 sm:p-8">
         <div className="flex flex-col items-center">
-          <span className="grid h-20 w-20 place-items-center rounded-full bg-brand text-[28px] font-bold text-white">
-            {profile.name.slice(0, 1).toUpperCase()}
-          </span>
-          {/* Logo upload UI only — no org-logo upload endpoint yet (integration follow-up). */}
+          {profile.logo_url ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={profile.logo_url} alt={`${profile.name} logo`} className="h-20 w-20 rounded-full object-cover" />
+          ) : (
+            <span className="grid h-20 w-20 place-items-center rounded-full bg-brand text-[28px] font-bold text-white">
+              {profile.name.slice(0, 1).toUpperCase()}
+            </span>
+          )}
+          <input
+            ref={logoInput}
+            type="file"
+            accept="image/png,image/jpeg,image/webp,image/gif"
+            className="hidden"
+            onChange={(e) => { const file = e.target.files?.[0]; if (file) void uploadLogo(file); e.target.value = ''; }}
+          />
           <button
             type="button"
-            title="Logo upload is a fast-follow"
-            className="mt-4 inline-flex items-center gap-2 rounded-full border border-rule bg-paper px-4 py-2 text-[13.5px] font-semibold text-ink opacity-60"
-            disabled
+            onClick={() => logoInput.current?.click()}
+            disabled={uploadingLogo}
+            className="mt-4 inline-flex items-center gap-2 rounded-full border border-rule bg-paper px-4 py-2 text-[13.5px] font-semibold text-ink transition hover:border-ink/30 disabled:opacity-60"
           >
-            ↑ Upload logo
+            {uploadingLogo ? 'Uploading…' : profile.logo_url ? 'Change logo' : '↑ Upload logo'}
           </button>
         </div>
 
@@ -158,7 +185,7 @@ export function BusinessDetailsTab({ profile, onSaved }: { profile: ClientProfil
                   aria-pressed={on}
                   onClick={() => toggleSocial(sc.value)}
                   className={`rounded-full px-5 py-2 text-[14px] font-semibold transition ${
-                    on ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+                    on ? 'bg-ink text-paper' : 'border border-rule bg-paper text-ink hover:border-ink/30'
                   }`}
                 >
                   {sc.label}

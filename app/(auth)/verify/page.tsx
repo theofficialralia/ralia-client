@@ -14,6 +14,7 @@ function VerifyInner() {
   const params = useSearchParams();
   const { setTokens } = useAuth();
   const phone = params.get('phone') ?? '';
+  const email = params.get('email') ?? '';
 
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -58,12 +59,11 @@ function VerifyInner() {
 
       <div className="flex flex-col items-center text-center">
         <LogoMark className="mb-5 h-10 w-10" />
-        <h1 className="text-[26px] font-extrabold tracking-tight text-ink">Verify your number</h1>
-        {/* The design says "email"; the API sends the code to the WhatsApp/phone
-            number from registration. Copy reflects what actually happens. */}
+        <h1 className="text-[26px] font-extrabold tracking-tight text-ink">Verify your email</h1>
+        {/* OTP is delivered by email (OTP_TRANSPORT=email). Copy reflects what actually happens. */}
         <p className="mt-2 text-[14px] text-muted">
           We&apos;ve sent a 6-digit code to{' '}
-          <span className="font-semibold text-ink">{phone || 'your WhatsApp number'}</span>
+          <span className="font-semibold text-ink">{email || 'your email'}</span>
         </p>
       </div>
 
