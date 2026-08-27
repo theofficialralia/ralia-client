@@ -2,10 +2,8 @@
 
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { api, ApiError, uuid, type Campaign, type CampaignPlan, type Quote } from '@/lib/api';
+import { api, ApiError, type Campaign, type CampaignPlan, type Quote } from '@/lib/api';
 import { Spinner } from '@/components/ui/Spinner';
-import { useAuth } from '@/lib/auth';
-import { loadPaystack, PAYSTACK_PUBLIC_KEY, paystackConfigured } from '@/lib/paystack';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, Textarea } from '@/components/ui/Field';
 import { Stepper } from '@/components/campaigns/wizard/Stepper';
@@ -119,7 +117,6 @@ const PLACEHOLDER_SLOTS = 5;
 
 function NewCampaignInner() {
   const router = useRouter();
-  const { user } = useAuth();
   const resumeId = useSearchParams().get('id');
   const [step, setStep] = useState(1);
   const [campaignId, setCampaignId] = useState<string | null>(null);
@@ -274,38 +271,17 @@ function NewCampaignInner() {
     }
   }
 
-  async function pay() {
-    if (!campaignId || !quote || !user) return;
-    if (!paystackConfigured()) {
-      return setError('Paystack is not configured. Add NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY to .env.local.');
-    }
-    setError(null);
-    try {
-      const paystack = await loadPaystack();
-      const handler = paystack.setup({
-        key: PAYSTACK_PUBLIC_KEY,
-        email: user.email,
-        amount: quote.price.amount_minor,
-        currency: 'NGN',
-        ref: `RLA-${campaignId.slice(0, 8)}-${uuid().slice(0, 8)}`,
-        metadata: { campaign_id: campaignId },
-        onClose: () => setError('Payment window closed before completing.'),
-        callback: (res) => { void confirmPayment(res.reference); },
-      });
-      handler.openIframe();
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Could not start payment.');
-    }
-  }
-
-  async function confirmPayment(reference: string) {
+  // The quote is locked; hand the campaign to an admin for review. Payment happens
+  // later, from the campaign page, once it's approved (governing: no campaign goes
+  // live without a human review). The client is emailed when the verdict lands.
+  async function submitForReview() {
     if (!campaignId) return;
     setBusy(true); setError(null);
     try {
-      await api.post(`/v1/campaigns/${campaignId}/payments/paystack/verify`, { reference }, { idempotencyKey: uuid() });
-      router.replace(`/campaigns/${campaignId}?funded=1`);
+      await api.post(`/v1/campaigns/${campaignId}/submit`, {});
+      router.replace(`/campaigns/${campaignId}?submitted=1`);
     } catch (e) {
-      setError(e instanceof ApiError ? e.message : 'We could not confirm the payment. If you were charged, contact support.');
+      setError(e instanceof ApiError ? e.message : 'Could not submit for review.');
       setBusy(false);
     }
   }
@@ -320,7 +296,7 @@ function NewCampaignInner() {
         <button onClick={() => router.push('/campaigns')} className="flex items-center gap-2 text-[15px] font-semibold text-muted hover:text-ink">
           ← Cancel &amp; Return
         </button>
-        <span className="text-[13px] text-muted">Step {step} of 5</span>
+        <span className="text-[13px] text-muted">Step {step} of 4</span>
       </div>
 
       <div className="mt-5"><Stepper current={step} /></div>
@@ -330,7 +306,6 @@ function NewCampaignInner() {
         {step === 2 && <Assets s={s} set={set} />}
         {step === 3 && <Targeting s={s} set={set} />}
         {step === 4 && campaignId && <QuoteStep campaignId={campaignId} quote={quote} committing={busy} onCommit={commitPlan} onDirty={() => setQuote(null)} />}
-        {step === 5 && <Fund quote={quote} />}
 
         {error && (
           <div className="mt-5 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] text-brand-700">{error}</div>
@@ -343,8 +318,7 @@ function NewCampaignInner() {
           {step === 1 && <Button onClick={saveBrief} loading={busy}>Proceed →</Button>}
           {step === 2 && <Button onClick={saveAssets} loading={busy}>Proceed →</Button>}
           {step === 3 && <Button onClick={saveTargeting} loading={busy}>Proceed →</Button>}
-          {step === 4 && <Button onClick={() => setStep(5)} disabled={!quote || busy}>Proceed →</Button>}
-          {step === 5 && <Button onClick={pay} loading={busy}>Pay with Paystack</Button>}
+          {step === 4 && <Button onClick={submitForReview} loading={busy} disabled={!quote || busy}>Submit for review →</Button>}
         </div>
       </div>
     </div>
@@ -810,23 +784,6 @@ function QuoteStep({ campaignId, quote, committing, onCommit, onDirty }: {
             {!meetsFloor ? `Minimum is ${plan.floor_minor.amount_display}` : `Lock in ${nairaFromMinor(value)}`}
           </Button>
         )}
-      </div>
-    </div>
-  );
-}
-
-function Fund({ quote }: { quote: Quote | null }) {
-  return (
-    <div>
-      <Header title="Fund the campaign" subtitle="Pay securely with Paystack. Your campaign goes live the moment payment clears." />
-      <div className="mt-3 rounded-2xl border border-rule p-6">
-        <div className="flex items-baseline justify-between">
-          <span className="text-[14px] text-muted">Amount to pay</span>
-          <span className="text-[28px] font-extrabold tracking-tight text-brand">{quote?.price.amount_display ?? '—'}</span>
-        </div>
-        <div className="mt-5 flex items-center gap-3 rounded-xl bg-wash px-4 py-3 text-[13px] text-muted">
-          Card details are entered in Paystack&apos;s secure window — Ralia never sees your card number.
-        </div>
       </div>
     </div>
   );
