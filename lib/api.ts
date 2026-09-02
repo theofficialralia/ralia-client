@@ -253,5 +253,7 @@ export type CampaignAnalytics = {
   acceptance_rate: number;
   completed: number;
   slots_total: number;
+  target_reach: number;
+  success_rate_pct: number;
   evidence: EvidenceItem[];
 };

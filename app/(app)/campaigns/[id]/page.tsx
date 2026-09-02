@@ -76,7 +76,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
       <LifecyclePanel campaignId={id} status={data.status} amount={data.budget} justSubmitted={justSubmitted} />
 
       {/* Stats */}
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Stat label="Amount spent" value={data.spent.amount_display} foot={`of ${data.budget.amount_display} budget`} />
         <Stat
           label="Views delivered"
@@ -94,6 +94,13 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
           foot={`Offer acceptance ${Math.round(data.acceptance_rate * 100)}%`}
         />
         <Stat label="Completed" value={`${data.completed}/${data.slots_total}`} foot="Verified &amp; paid" />
+        {data.target_reach > 0 && (
+          <Stat
+            label="Success rate"
+            value={`${data.success_rate_pct}%`}
+            foot={`${data.views_delivered.toLocaleString('en-NG')} of ${data.target_reach.toLocaleString('en-NG')} target reach`}
+          />
+        )}
       </div>
 
       {/* Evidence gallery */}
