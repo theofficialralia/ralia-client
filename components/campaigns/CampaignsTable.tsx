@@ -1,9 +1,11 @@
 'use client';
 
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useMutation } from '@tanstack/react-query';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { objectiveLabel } from '@/lib/campaign-options';
-import type { DashboardRow } from '@/lib/api';
+import { api, type Campaign, type DashboardRow } from '@/lib/api';
 
 /**
  * The shared "Everything you're running" table used by the dashboard and the
@@ -11,6 +13,12 @@ import type { DashboardRow } from '@/lib/api';
  * their delivery view.
  */
 export function CampaignsTable({ rows, empty }: { rows: DashboardRow[]; empty?: React.ReactNode }) {
+  const router = useRouter();
+  const runAgain = useMutation({
+    mutationFn: (id: string) => api.post<Campaign>(`/v1/campaigns/${id}/duplicate`, {}),
+    onSuccess: (c) => router.push(`/campaigns/new?id=${c.id}`),
+  });
+
   if (rows.length === 0) {
     return (
       <div className="card px-6 py-16 text-center">
@@ -57,12 +65,25 @@ export function CampaignsTable({ rows, empty }: { rows: DashboardRow[]; empty?: 
                   <td className="px-4 py-4 tabular-nums">{c.views.toLocaleString('en-NG')}</td>
                   <td className="px-4 py-4 tabular-nums">{c.completed}/{c.slots_total}</td>
                   <td className="px-4 py-4 text-right">
-                    <Link href={href} className="inline-flex items-center gap-1 font-semibold text-brand-700">
-                      {draft ? 'Resume' : 'Open'}
-                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-                        <path d="M7 17 17 7M8 7h9v9" />
-                      </svg>
-                    </Link>
+                    <div className="inline-flex items-center gap-4">
+                      {!draft && (
+                        <button
+                          type="button"
+                          onClick={() => runAgain.mutate(c.id)}
+                          disabled={runAgain.isPending}
+                          className="font-semibold text-muted transition hover:text-ink disabled:opacity-50"
+                          title="Duplicate this campaign into a new draft to run again"
+                        >
+                          {runAgain.isPending && runAgain.variables === c.id ? 'Copying…' : '↻ Run again'}
+                        </button>
+                      )}
+                      <Link href={href} className="inline-flex items-center gap-1 font-semibold text-brand-700">
+                        {draft ? 'Resume' : 'Open'}
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+                          <path d="M7 17 17 7M8 7h9v9" />
+                        </svg>
+                      </Link>
+                    </div>
                   </td>
                 </tr>
               );
