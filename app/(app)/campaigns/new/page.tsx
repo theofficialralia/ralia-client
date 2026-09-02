@@ -564,6 +564,8 @@ function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
   // Every targeting facet is multi-select — toggle a label in/out of its list.
   const toggle = (key: 'locations' | 'ageBuckets' | 'genders' | 'languages' | 'categories' | 'platforms', v: string) =>
     set({ [key]: s[key].includes(v) ? s[key].filter((x) => x !== v) : [...s[key], v] } as Partial<State>);
+  // "All X" = no restriction on that facet (empty list). Clicking it clears the row.
+  const clear = (key: 'locations' | 'genders' | 'languages' | 'categories' | 'platforms') => set({ [key]: [] } as Partial<State>);
 
   return (
     <div className="space-y-7">
@@ -574,12 +576,12 @@ function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
         </span>
       </div>
 
-      <ChipMulti label="Location" options={LOCATIONS.map((l) => l.label)} value={s.locations} onToggle={(v) => toggle('locations', v)} />
+      <ChipMulti label="Location" options={LOCATIONS.map((l) => l.label)} value={s.locations} onToggle={(v) => toggle('locations', v)} allLabel="All locations" onClear={() => clear('locations')} />
       <ChipMulti label="Age range" options={AGE_BUCKETS.map((a) => a.label)} value={s.ageBuckets} onToggle={(v) => toggle('ageBuckets', v)} />
-      <ChipMulti label="Gender" options={GENDER_OPTIONS.map((g) => g.label)} value={s.genders} onToggle={(v) => toggle('genders', v)} />
-      <ChipMulti label="Language" options={LANGUAGES} value={s.languages} onToggle={(v) => toggle('languages', v)} />
-      <ChipMulti label="Category of interest" options={CATEGORIES} value={s.categories} onToggle={(v) => toggle('categories', v)} />
-      <ChipMulti label="Where should they promote this?" options={PLATFORMS.map((p) => p.label)} value={s.platforms} onToggle={(v) => toggle('platforms', v)} />
+      <ChipMulti label="Gender" options={GENDER_OPTIONS.map((g) => g.label)} value={s.genders} onToggle={(v) => toggle('genders', v)} allLabel="All genders" onClear={() => clear('genders')} />
+      <ChipMulti label="Language" options={LANGUAGES} value={s.languages} onToggle={(v) => toggle('languages', v)} allLabel="All languages" onClear={() => clear('languages')} />
+      <ChipMulti label="Category of interest" options={CATEGORIES} value={s.categories} onToggle={(v) => toggle('categories', v)} allLabel="All categories" onClear={() => clear('categories')} />
+      <ChipMulti label="Where should they promote this?" options={PLATFORMS.map((p) => p.label)} value={s.platforms} onToggle={(v) => toggle('platforms', v)} allLabel="Anywhere" onClear={() => clear('platforms')} />
 
       <div>
         <p className="text-[15px] font-semibold text-ink">Who should promote this?</p>
@@ -860,11 +862,23 @@ function RadioCard({ on, onClick, title, body }: { on: boolean; onClick: () => v
   );
 }
 
-function ChipMulti({ label, options, value, onToggle }: { label: string; options: string[]; value: string[]; onToggle: (v: string) => void }) {
+function ChipMulti({ label, options, value, onToggle, allLabel, onClear }: { label: string; options: string[]; value: string[]; onToggle: (v: string) => void; allLabel?: string; onClear?: () => void }) {
+  const allOn = value.length === 0;
   return (
     <div>
       <p className="mb-2 text-[14px] font-semibold text-ink">{label}</p>
       <div className="flex flex-wrap gap-2.5">
+        {allLabel && onClear && (
+          <button
+            type="button"
+            onClick={onClear}
+            className={`rounded-full px-4 py-2 text-[13px] font-semibold transition ${
+              allOn ? 'bg-ink text-paper' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+            }`}
+          >
+            {allLabel}
+          </button>
+        )}
         {options.map((o) => {
           const on = value.includes(o);
           return (
