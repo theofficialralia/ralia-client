@@ -150,11 +150,9 @@ function NewCampaignInner() {
 
   async function saveBrief() {
     if (!s.name.trim()) return setError('Give your campaign a name.');
-    // A destination link is where clicks go — required for every objective except
-    // Visibility (Awareness), which is views-only. If given, it must be a valid URL.
-    const needsDestination = s.objective !== 'AWARENESS';
+    // The destination link is always optional — some owners just upload creative for
+    // promoters to post. If given, it must be a valid URL.
     const hasDestination = /^https?:\/\//.test(s.destination_url);
-    if (needsDestination && !hasDestination) return setError('Enter a valid destination link (https://…).');
     if (s.destination_url.trim() && !hasDestination) return setError('That destination link isn’t a valid URL (https://…).');
     if (s.startsAt && s.endsAt && s.endsAt <= s.startsAt) return setError('The end date must be after the start date.');
     if (s.cadence !== 'ONE_OFF' && !s.endsAt) return setError('Set an end date before choosing a repeating schedule.');
@@ -400,11 +398,9 @@ function Brief({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
       <Field label="Description">
         <Textarea value={s.description} onChange={(e) => set({ description: e.target.value })} placeholder="What is this campaign about, and who is it for?" />
       </Field>
-      <Field label={s.objective === 'AWARENESS' ? 'Destination Link (optional)' : 'Destination Link'}>
+      <Field label="Destination Link (optional)">
         <Input value={s.destination_url} onChange={(e) => set({ destination_url: e.target.value })} placeholder="https://" />
-        {s.objective === 'AWARENESS' && (
-          <p className="mt-1 text-[12px] text-muted">Visibility campaigns are views-only — add a link only if you want clicks tracked.</p>
-        )}
+        <p className="mt-1 text-[12px] text-muted">Where clicks should go. Leave blank if promoters should just post your uploaded creative.</p>
       </Field>
 
       <div>
