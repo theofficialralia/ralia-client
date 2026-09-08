@@ -1,4 +1,4 @@
-const STEPS = ['Brief', 'Assets', 'Targeting', 'Budget'];
+const STEPS = ['Brief', 'Assets', 'Targeting', 'Budget', 'Fund'];
 
 export function Stepper({ current }: { current: number }) {
   return (

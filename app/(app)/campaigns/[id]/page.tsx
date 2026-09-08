@@ -3,11 +3,9 @@
 import { use, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { api, ApiError, uuid, type CampaignAnalytics, type EvidenceItem } from '@/lib/api';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api, ApiError, type CampaignAnalytics, type EvidenceItem } from '@/lib/api';
 import type { Money } from '@/lib/money';
-import { useAuth } from '@/lib/auth';
-import { loadPaystack, PAYSTACK_PUBLIC_KEY, paystackConfigured } from '@/lib/paystack';
 import { platformLabel, timeAgo } from '@/lib/format';
 import { objectiveLabel } from '@/lib/campaign-options';
 import { StatusPill } from '@/components/ui/StatusPill';
@@ -147,57 +145,27 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
 }
 
 /**
- * The pre-live lifecycle for a campaign: submitted → under review → approved →
- * pay → live. Payment is gated behind admin approval — it only appears once the
- * campaign reaches CONFIRMING_PAYMENT.
+ * The pre-live lifecycle: pay (in the wizard) → under review → approved & LIVE,
+ * or sent back for changes / rejected & refunded. Payment happens in the create
+ * wizard now, so this panel only reflects the review outcome.
  */
-function LifecyclePanel({ campaignId, status, amount, justSubmitted }: {
+function LifecyclePanel({ campaignId, status, justSubmitted }: {
   campaignId: string; status: string; amount: Money; justSubmitted: boolean;
 }) {
-  const { user } = useAuth();
   const qc = useQueryClient();
   const [err, setErr] = useState<string | null>(null);
-  const [paying, setPaying] = useState(false);
-
-  async function confirmPayment(reference: string) {
-    try {
-      await api.post(`/v1/campaigns/${campaignId}/payments/paystack/verify`, { reference }, { idempotencyKey: uuid() });
-      await qc.invalidateQueries({ queryKey: ['campaign-analytics', campaignId] });
-    } catch (e) {
-      setErr(e instanceof ApiError ? e.message : 'We could not confirm the payment. If you were charged, contact support.');
-    } finally {
-      setPaying(false);
-    }
-  }
-
-  async function pay() {
-    if (!user) return;
-    if (!paystackConfigured()) return setErr('Paystack is not configured (NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY).');
-    setErr(null); setPaying(true);
-    try {
-      const paystack = await loadPaystack();
-      paystack.setup({
-        key: PAYSTACK_PUBLIC_KEY,
-        email: user.email,
-        amount: amount.amount_minor,
-        currency: 'NGN',
-        ref: `RLA-${campaignId.slice(0, 8)}-${uuid().slice(0, 8)}`,
-        metadata: { campaign_id: campaignId },
-        onClose: () => { setErr('Payment window closed before completing.'); setPaying(false); },
-        callback: (res) => { void confirmPayment(res.reference); },
-      }).openIframe();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : 'Could not start payment.');
-      setPaying(false);
-    }
-  }
+  const resubmit = useMutation({
+    mutationFn: () => api.post(`/v1/campaigns/${campaignId}/submit`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['campaign-analytics', campaignId] }),
+    onError: (e: unknown) => setErr(e instanceof ApiError ? e.message : 'Could not resubmit.'),
+  });
 
   if (status === 'PENDING_APPROVAL') {
     return (
       <div className="mt-5 rounded-2xl border border-warn/30 bg-warn-wash px-5 py-4">
-        <p className="text-[15px] font-bold text-warn">{justSubmitted ? 'Submitted for review ✓' : 'Under review'}</p>
+        <p className="text-[15px] font-bold text-warn">{justSubmitted ? 'Payment received — under review ✓' : 'Under review'}</p>
         <p className="mt-1 text-[13.5px] text-body">
-          Our team reviews every campaign before it goes live. We&apos;ll email you the moment it&apos;s approved — then you can pay to launch.
+          Your payment is in. Our team reviews every campaign before it goes live — we&apos;ll email you the moment it&apos;s approved.
         </p>
       </div>
     );
@@ -205,25 +173,26 @@ function LifecyclePanel({ campaignId, status, amount, justSubmitted }: {
 
   if (status === 'REJECTED') {
     return (
-      <div className="mt-5 rounded-2xl border border-brand/30 bg-brand/5 px-5 py-4">
-        <p className="text-[15px] font-bold text-brand-700">This campaign was declined</p>
+      <div className="mt-5 rounded-2xl border border-warn/30 bg-warn-wash px-5 py-4">
+        <p className="text-[15px] font-bold text-warn">Changes needed before this can go live</p>
         <p className="mt-1 text-[13.5px] text-body">
-          It didn&apos;t pass review. Check your email for the reason, or contact support if you think this was a mistake.
+          Our team sent this back — check your email for what to fix. Your payment is safe; edit the campaign, then resubmit for review (no need to pay again).
         </p>
+        <div className="mt-3 flex items-center gap-3">
+          <Button onClick={() => resubmit.mutate()} loading={resubmit.isPending}>Resubmit for review</Button>
+        </div>
+        {err && <p className="mt-2 text-[12.5px] text-brand-700">{err}</p>}
       </div>
     );
   }
 
-  if (status === 'CONFIRMING_PAYMENT') {
+  if (status === 'CANCELLED') {
     return (
-      <div className="mt-5 rounded-2xl border border-ok/30 bg-ok-wash px-5 py-4">
-        <p className="text-[15px] font-bold text-ok">Approved — pay to go live</p>
-        <p className="mt-1 text-[13.5px] text-body">Your campaign passed review. Pay securely with Paystack and it goes live the moment payment clears.</p>
-        <div className="mt-3 flex items-center gap-4">
-          <span className="text-[24px] font-extrabold tracking-tight text-ink">{amount.amount_display}</span>
-          <Button onClick={pay} loading={paying}>Pay with Paystack</Button>
-        </div>
-        {err && <p className="mt-2 text-[12.5px] text-brand-700">{err}</p>}
+      <div className="mt-5 rounded-2xl border border-brand/30 bg-brand/5 px-5 py-4">
+        <p className="text-[15px] font-bold text-brand-700">This campaign was rejected — and refunded</p>
+        <p className="mt-1 text-[13.5px] text-body">
+          It didn&apos;t pass review, so it won&apos;t run. Your payment has been refunded to your Ralia balance. Contact support if you think this was a mistake.
+        </p>
       </div>
     );
   }
