@@ -128,6 +128,9 @@ function NewCampaignInner() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hydrating, setHydrating] = useState(!!resumeId);
+  // A managed, high-touch path was chosen (Ralia designs the creative, or hand-matches
+  // an influencer) — the automated wizard stops and we hand off to the team by email.
+  const [managed, setManaged] = useState<null | 'DESIGN' | 'INFLUENCER'>(null);
 
   const set = (patch: Partial<State>) => setS((prev) => ({ ...prev, ...patch }));
 
@@ -202,7 +205,11 @@ function NewCampaignInner() {
         }
         await api.patch(`/v1/campaigns/${campaignId}`, { needs_creative: false });
       } else {
+        // "Design one for me" is a managed service — Ralia's team makes the creative.
+        // It leaves the automated flow here and we reach out by email/WhatsApp.
         await api.patch(`/v1/campaigns/${campaignId}`, { needs_creative: true, design_brief: s.designBrief || undefined });
+        setManaged('DESIGN');
+        return;
       }
       setStep(3);
     } catch (e) {
@@ -253,6 +260,12 @@ function NewCampaignInner() {
         },
       });
       setQuote(null);
+      // "Reach a bigger audience" is a managed, hand-matched service — it leaves the
+      // automated quote/pay flow here and Ralia's team reaches out to arrange it.
+      if (s.role === 'INFLUENCER') {
+        setManaged('INFLUENCER');
+        return;
+      }
       setStep(4);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not save targeting.');
@@ -318,6 +331,8 @@ function NewCampaignInner() {
   if (hydrating) {
     return <div className="flex justify-center py-24"><Spinner className="h-8 w-8 text-brand" /></div>;
   }
+
+  if (managed) return <ManagedPathScreen kind={managed} onDone={() => router.push('/campaigns')} />;
 
   return (
     <div className="mx-auto max-w-4xl">
@@ -593,19 +608,24 @@ function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
   const toggle = (key: 'locations' | 'ageBuckets' | 'genders' | 'languages' | 'categories' | 'platforms', v: string) =>
     set({ [key]: s[key].includes(v) ? s[key].filter((x) => x !== v) : [...s[key], v] } as Partial<State>);
   // "All X" = no restriction on that facet (empty list). Clicking it clears the row.
-  const clear = (key: 'locations' | 'genders' | 'languages' | 'categories' | 'platforms') => set({ [key]: [] } as Partial<State>);
+  const clear = (key: 'locations' | 'ageBuckets' | 'genders' | 'languages' | 'categories' | 'platforms') => set({ [key]: [] } as Partial<State>);
 
   return (
     <div className="space-y-7">
       <div className="flex items-start justify-between gap-4">
         <Header title="Target the right people." subtitle="Pick as many as you like in each row — the quote on the next screen moves live with every choice." />
-        <span className="hidden shrink-0 rounded-full border border-rule px-4 py-2 text-[13px] font-semibold text-brand-700 sm:inline-flex">
+        <a
+          href="https://wa.me/2348139376563"
+          target="_blank"
+          rel="noreferrer"
+          className="hidden shrink-0 rounded-full border border-rule px-4 py-2 text-[13px] font-semibold text-brand-700 transition hover:bg-wash sm:inline-flex"
+        >
           📞 Need help? Talk to us
-        </span>
+        </a>
       </div>
 
       <ChipMulti label="Location" options={LOCATIONS.map((l) => l.label)} value={s.locations} onToggle={(v) => toggle('locations', v)} allLabel="All locations" onClear={() => clear('locations')} />
-      <ChipMulti label="Age range" options={AGE_BUCKETS.map((a) => a.label)} value={s.ageBuckets} onToggle={(v) => toggle('ageBuckets', v)} />
+      <ChipMulti label="Age range" options={AGE_BUCKETS.map((a) => a.label)} value={s.ageBuckets} onToggle={(v) => toggle('ageBuckets', v)} allLabel="All ages" onClear={() => clear('ageBuckets')} />
       <ChipMulti label="Gender" options={GENDER_OPTIONS.map((g) => g.label)} value={s.genders} onToggle={(v) => toggle('genders', v)} allLabel="All genders" onClear={() => clear('genders')} />
       <ChipMulti label="Language" options={LANGUAGES} value={s.languages} onToggle={(v) => toggle('languages', v)} allLabel="All languages" onClear={() => clear('languages')} />
       <ChipMulti label="Category of interest" options={CATEGORIES} value={s.categories} onToggle={(v) => toggle('categories', v)} allLabel="All categories" onClear={() => clear('categories')} />
@@ -627,9 +647,9 @@ function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
                 }`}
               >
                 <div className="text-[16px] font-bold">
-                  {r.title}{r.tag ? <span className={on ? 'text-white/70' : 'text-muted'}> ({r.tag})</span> : ''}
+                  {r.title}{r.tag ? <span className={on ? 'text-paper/70' : 'text-muted'}> ({r.tag})</span> : ''}
                 </div>
-                <p className={`mt-1.5 text-[13px] leading-snug ${on ? 'text-white/70' : 'text-muted'}`}>{r.body}</p>
+                <p className={`mt-1.5 text-[13px] leading-snug ${on ? 'text-paper/70' : 'text-muted'}`}>{r.body}</p>
               </button>
             );
           })}
@@ -824,6 +844,33 @@ function QuoteStep({ campaignId, quote, committing, onCommit, onDirty }: {
 }
 
 // ── Bits ───────────────────────────────────────────────────
+
+/**
+ * Terminal screen for the two managed, high-touch services — Ralia's team designs
+ * the creative, or hand-matches a high-profile creator. These leave the automated
+ * quote/pay flow and are arranged directly with the team by email/WhatsApp.
+ */
+function ManagedPathScreen({ kind, onDone }: { kind: 'DESIGN' | 'INFLUENCER'; onDone: () => void }) {
+  const design = kind === 'DESIGN';
+  const title = design ? 'Ralia will design your creative' : 'We’ll hand-match your creator';
+  const body = design
+    ? 'This one’s on us to make. Our design team will craft your poster and caption and send it over — we’ve saved your brief. We’ll email you shortly to finish setting up your campaign.'
+    : 'Reaching a bigger audience is a hand-matched service. Our team will pair you with the right high-profile creator for a collab — we’ve saved your brief and will email you shortly to arrange it.';
+  return (
+    <div className="mx-auto max-w-lg py-10 text-center">
+      <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-brand/10 text-[28px] text-brand">✦</div>
+      <h1 className="mt-5 text-[24px] font-extrabold tracking-tight text-ink">{title}</h1>
+      <p className="mt-2 text-[14.5px] leading-relaxed text-muted">{body}</p>
+      <div className="mt-6 flex flex-col items-center gap-3">
+        <a href="https://wa.me/2348139376563" target="_blank" rel="noreferrer" className="w-full">
+          <Button className="w-full">💬 Message us on WhatsApp</Button>
+        </a>
+        <a href="mailto:support@ralia.co?subject=Managed%20campaign%20request" className="text-[13.5px] font-semibold text-brand-700">Or email support@ralia.co</a>
+        <button onClick={onDone} className="mt-2 text-[13.5px] font-semibold text-muted hover:text-ink">Back to my campaigns</button>
+      </div>
+    </div>
+  );
+}
 
 function Fund({ quote }: { quote: Quote | null }) {
   return (

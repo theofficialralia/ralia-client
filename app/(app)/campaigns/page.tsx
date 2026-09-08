@@ -1,10 +1,8 @@
 'use client';
 
-import Link from 'next/link';
 import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, type DashboardSummary } from '@/lib/api';
-import { Button } from '@/components/ui/Button';
 import { Spinner } from '@/components/ui/Spinner';
 import { CampaignFilterPills, CampaignsTable, matchesFilter, type CampaignFilter } from '@/components/campaigns/CampaignsTable';
 
@@ -26,14 +24,10 @@ export default function CampaignsPage() {
 
   return (
     <div className="mx-auto max-w-6xl">
-      <div className="flex items-center justify-between">
-        <div>
-          <p className="text-[13px] font-semibold text-brand-700">My Campaigns</p>
-          <h1 className="text-[26px] font-extrabold tracking-tight text-ink">Everything you&apos;re running</h1>
-        </div>
-        <Link href="/campaigns/new">
-          <Button><span className="text-lg leading-none">+</span> New campaign</Button>
-        </Link>
+      {/* The header already has a "New campaign" button, so this page doesn't repeat it. */}
+      <div>
+        <p className="text-[13px] font-semibold text-brand-700">My Campaigns</p>
+        <h1 className="text-[26px] font-extrabold tracking-tight text-ink">Everything you&apos;re running</h1>
       </div>
 
       {isLoading ? (

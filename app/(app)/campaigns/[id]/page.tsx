@@ -54,7 +54,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
           <Button variant="secondary" size="sm" disabled title="Pausing is a fast-follow">
             ❙❙ Pause
           </Button>
-          <Button variant="secondary" size="sm" disabled title="Report export is a fast-follow">
+          <Button variant="secondary" size="sm" onClick={() => exportReport(data)}>
             ↓ Export report
           </Button>
         </div>
@@ -198,6 +198,39 @@ function LifecyclePanel({ campaignId, status, justSubmitted }: {
   }
 
   return null;
+}
+
+/** Build a CSV of the campaign summary + every piece of proof, and download it. */
+function exportReport(data: CampaignAnalytics) {
+  const cell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+  const lines: string[] = [
+    'Ralia campaign report',
+    `${cell('Campaign')},${cell(data.name)}`,
+    `${cell('Objective')},${cell(objectiveLabel(data.objective))}`,
+    `${cell('Status')},${cell(data.status)}`,
+    `${cell('Amount spent')},${cell(data.spent.amount_display)}`,
+    `${cell('Budget')},${cell(data.budget.amount_display)}`,
+    `${cell('Views delivered')},${cell(data.views_delivered)}`,
+    `${cell('Clicks delivered')},${cell(data.clicks_delivered)}`,
+    `${cell('Target reach')},${cell(data.target_reach)}`,
+    `${cell('Success rate')},${cell(`${data.success_rate_pct}%`)}`,
+    `${cell('Completed')},${cell(`${data.completed}/${data.slots_total}`)}`,
+    '',
+    'Proof of promotion',
+    ['Promoter', 'Handle', 'Platform', 'Views', 'Submitted', 'Verdict', 'Link'].map(cell).join(','),
+    ...data.evidence.map((e) =>
+      [e.promoter_name ?? '', e.promoter_handle ?? '', e.platform, e.views, new Date(e.submitted_at).toISOString(), e.verdict, e.public_url ?? '']
+        .map(cell)
+        .join(','),
+    ),
+  ];
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${data.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-report.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 function Stat({ label, value, foot }: { label: string; value: string; foot: string }) {

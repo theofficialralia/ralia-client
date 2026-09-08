@@ -151,7 +151,7 @@ function SidebarPanel({
           <LifebuoyIcon /> {!collapsed && 'Help & Support'}
         </a>
         <button
-          onClick={() => logout()}
+          onClick={() => { if (window.confirm('Log out of Ralia?')) void logout(); }}
           title={collapsed ? 'Log out' : undefined}
           className={`flex w-full items-center rounded-xl py-3 text-[14.5px] font-semibold text-white/60 transition hover:bg-white/5 hover:text-white ${collapsed ? 'justify-center px-0' : 'gap-3 px-4'}`}
         >

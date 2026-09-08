@@ -48,13 +48,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           >
             <MenuIcon />
           </button>
-          <div className="relative hidden max-w-lg flex-1 sm:block">
-            <SearchIcon />
-            <input
-              placeholder="Search campaigns, promoters, evidence"
-              className="w-full rounded-full border border-rule bg-paper py-2.5 pl-11 pr-4 text-[14px] outline-none focus:border-brand focus:ring-4 focus:ring-brand/10"
-            />
-          </div>
+          {/* Global search is a planned feature — hidden until it's wired, rather than
+              showing a box that does nothing. */}
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
             <NotificationBell />
             <ThemeToggle />
@@ -74,17 +69,6 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         <main className="flex-1 px-4 py-5 sm:px-6 sm:py-6">{children}</main>
       </div>
     </div>
-  );
-}
-
-function SearchIcon() {
-  return (
-    <svg
-      className="absolute left-4 top-1/2 -translate-y-1/2 text-muted"
-      width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"
-    >
-      <circle cx="11" cy="11" r="7" /><path d="m21 21-4.3-4.3" />
-    </svg>
   );
 }
 
