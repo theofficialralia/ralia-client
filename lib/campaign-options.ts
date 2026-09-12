@@ -7,7 +7,7 @@ export const OBJECTIVES = [
 ] as const;
 
 /**
- * The client-facing objective labels — the exact words shown in the create
+ * The client-facing objective labels - the exact words shown in the create
  * wizard. Use this ANYWHERE a campaign's objective is displayed so it always
  * matches what the client actually chose (e.g. they picked "Sales", never the
  * raw enum "Purchase"; "Visibility", never "Awareness").
@@ -47,7 +47,7 @@ export const ROLES = [
 /**
  * The single Category-of-Interest taxonomy (dev-support spec R736-GEN-OD-00001).
  * Used for campaign categories, promoter preferred_categories, and business
- * sector — they must match so matching's categoryFit actually lines up.
+ * sector - they must match so matching's categoryFit actually lines up.
  */
 export const CATEGORIES = [
   'Technology & Digital Products',

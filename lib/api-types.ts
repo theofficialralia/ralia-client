@@ -102,7 +102,7 @@ export interface paths {
         put?: never;
         /**
          * Request a verification code
-         * @description Always returns 202, whether or not the number is registered — an unauthenticated caller does not get to enumerate accounts.
+         * @description Always returns 202, whether or not the number is registered - an unauthenticated caller does not get to enumerate accounts.
          */
         post: operations["AuthController_requestOtp"];
         delete?: never;
@@ -386,7 +386,7 @@ export interface paths {
         put?: never;
         /**
          * Preview price for a budget or slot count
-         * @description Stateless budget↔reach preview — solves slots/reach for a budget (or prices a slot count). Persists nothing; use it to drive the slider, then quote to commit.
+         * @description Stateless budget↔reach preview - solves slots/reach for a budget (or prices a slot count). Persists nothing; use it to drive the slider, then quote to commit.
          */
         post: operations["CampaignsController_plan"];
         delete?: never;
@@ -453,7 +453,7 @@ export interface paths {
         head?: never;
         /**
          * Update business details
-         * @description Partial — only the fields sent are changed.
+         * @description Partial - only the fields sent are changed.
          */
         patch: operations["ClientsController_update"];
         trace?: never;
@@ -577,7 +577,7 @@ export interface paths {
         put?: never;
         /**
          * Override a promoter’s per-role capability (§3)
-         * @description Merges the given 0–100 scores over the computed ones and records the confirmation.
+         * @description Merges the given 0-100 scores over the computed ones and records the confirmation.
          */
         post: operations["AdminController_setCapability"];
         delete?: never;
@@ -597,7 +597,7 @@ export interface paths {
         put?: never;
         /**
          * Set a promoter’s KYC state (§10)
-         * @description Gates cash-out — a payout can only be approved once KYC is VERIFIED.
+         * @description Gates cash-out - a payout can only be approved once KYC is VERIFIED.
          */
         post: operations["AdminController_setKyc"];
         delete?: never;
@@ -635,7 +635,7 @@ export interface paths {
         };
         /**
          * Campaign detail for review
-         * @description Client, brief, targeting and assets — for approval and matching context.
+         * @description Client, brief, targeting and assets - for approval and matching context.
          */
         get: operations["AdminController_campaignDetail"];
         put?: never;
@@ -734,7 +734,7 @@ export interface paths {
         put?: never;
         /**
          * Verify a channel’s audience evidence
-         * @description Sets the verification tier (screenshot/insights), stamps verified_at, and recomputes effective reach — lifting the self-reported cap.
+         * @description Sets the verification tier (screenshot/insights), stamps verified_at, and recomputes effective reach - lifting the self-reported cap.
          */
         post: operations["AdminController_verifyChannel"];
         delete?: never;
@@ -774,7 +774,7 @@ export interface paths {
         put?: never;
         /**
          * Approve proof and settle the promoter pro-rata
-         * @description Pays the promoter pro-rata on verified_views, takes Ralia’s cut, and refunds the undelivered remainder to the client — all in one balanced transaction. A delivery below the threshold is refused (reject instead). Requires an Idempotency-Key.
+         * @description Pays the promoter pro-rata on verified_views, takes Ralia’s cut, and refunds the undelivered remainder to the client - all in one balanced transaction. A delivery below the threshold is refused (reject instead). Requires an Idempotency-Key.
          */
         post: operations["AdminController_approveSubmission"];
         delete?: never;
@@ -851,7 +851,7 @@ export interface paths {
         put?: never;
         /**
          * Fail a not-yet-paid withdrawal (reason required)
-         * @description REQUESTED/APPROVED → FAILED. The balance is untouched — nothing was posted yet.
+         * @description REQUESTED/APPROVED → FAILED. The balance is untouched - nothing was posted yet.
          */
         post: operations["AdminController_failWithdrawal"];
         delete?: never;
@@ -871,7 +871,7 @@ export interface paths {
         put?: never;
         /**
          * Reverse a paid withdrawal that bounced (reason required)
-         * @description DR BANK_CLEARING / CR PROMOTER_AVAILABLE — funds return to the promoter’s balance. Requires an Idempotency-Key.
+         * @description DR BANK_CLEARING / CR PROMOTER_AVAILABLE - funds return to the promoter’s balance. Requires an Idempotency-Key.
          */
         post: operations["AdminController_reverseWithdrawal"];
         delete?: never;
@@ -909,7 +909,7 @@ export interface paths {
         };
         /**
          * Platform exposure & payout liability (§10)
-         * @description Money position by account kind + the payout obligation in flight. promoter_payable is fully backed by settled escrow — fully_backed proves it.
+         * @description Money position by account kind + the payout obligation in flight. promoter_payable is fully backed by settled escrow - fully_backed proves it.
          */
         get: operations["AdminController_exposure"];
         put?: never;
@@ -1238,7 +1238,7 @@ export interface paths {
         };
         /**
          * Campaign analytics and evidence gallery
-         * @description Views delivered, offer acceptance, completion, amount spent, and every verified/pending submission with its screenshot — the four SOW metrics plus the evidence gallery (handoff §6).
+         * @description Views delivered, offer acceptance, completion, amount spent, and every verified/pending submission with its screenshot - the four SOW metrics plus the evidence gallery (handoff §6).
          */
         get: operations["AnalyticsController_campaign"];
         put?: never;
@@ -1300,7 +1300,7 @@ export interface paths {
         put?: never;
         /**
          * Submit proof for an assignment
-         * @description A screenshot is required; public_url is optional because a WhatsApp status has none. The screenshot is perceptually hashed and compared with existing proof; a match sets auto_flag for the admin. Nothing auto-approves — every submission lands PENDING in the review queue.
+         * @description A screenshot is required; public_url is optional because a WhatsApp status has none. The screenshot is perceptually hashed and compared with existing proof; a match sets auto_flag for the admin. Nothing auto-approves - every submission lands PENDING in the review queue.
          */
         post: operations["EvidenceController_submit"];
         delete?: never;
@@ -1358,7 +1358,7 @@ export interface paths {
         put?: never;
         /**
          * Request a withdrawal
-         * @description Does not move money — the admin records the transfer they send. Rejected below the configured minimum or above the unencumbered balance.
+         * @description Does not move money - the admin records the transfer they send. Rejected below the configured minimum or above the unencumbered balance.
          */
         post: operations["WalletController_request"];
         delete?: never;
@@ -1519,11 +1519,11 @@ export interface components {
             trust_score: number;
             /** @description Roles this promoter offers. */
             roles: ("DISTRIBUTOR" | "CREATOR" | "PARTICIPATOR" | "INFLUENCER")[];
-            /** @description Self-reported capability factors (0–1). */
+            /** @description Self-reported capability factors (0-1). */
             capability_inputs: {
                 [key: string]: number;
             } | null;
-            /** @description Admin-confirmed per-role capability (0–100). */
+            /** @description Admin-confirmed per-role capability (0-100). */
             capability_scores: {
                 [key: string]: number;
             } | null;
@@ -1573,7 +1573,7 @@ export interface components {
             max_campaigns_per_week?: number;
             /** @description The roles this promoter offers. */
             roles?: ("DISTRIBUTOR" | "CREATOR" | "PARTICIPATOR" | "INFLUENCER")[];
-            /** @description Self-reported capability factors, each normalised 0–1. */
+            /** @description Self-reported capability factors, each normalised 0-1. */
             capability_inputs?: {
                 [key: string]: number;
             };
@@ -1687,7 +1687,7 @@ export interface components {
             destination_url: Record<string, never>;
             slots_total: number;
             slots_filled: number;
-            /** @description Human clicks delivered — present on the single-campaign detail. */
+            /** @description Human clicks delivered - present on the single-campaign detail. */
             total_clicks?: number;
             /** @description The price quoted, frozen at quote time. */
             price: components["schemas"]["MoneyDto"] | null;
@@ -1775,12 +1775,12 @@ export interface components {
         };
         PlanRequestDto: {
             /**
-             * @description Budget in kobo — solves for how many slots it buys.
+             * @description Budget in kobo - solves for how many slots it buys.
              * @example 500000
              */
             budget_minor?: number;
             /**
-             * @description Slot count — prices that many slots directly.
+             * @description Slot count - prices that many slots directly.
              * @example 12
              */
             slots?: number;
@@ -1812,7 +1812,7 @@ export interface components {
             /** Format: uuid */
             org_id: string;
             name: string;
-            /** @description The account login email. Read-only here — changing it needs re-verification. */
+            /** @description The account login email. Read-only here - changing it needs re-verification. */
             email: string;
             industry: Record<string, never> | null;
             phone_whatsapp: Record<string, never> | null;
@@ -1861,7 +1861,7 @@ export interface components {
         };
         SetCapabilityDto: {
             /**
-             * @description Per-role capability, 0–100. Merged over the computed scores.
+             * @description Per-role capability, 0-100. Merged over the computed scores.
              * @example {
              *       "DISTRIBUTOR": 78,
              *       "CREATOR": 60
@@ -1892,7 +1892,7 @@ export interface components {
         };
         VerifyChannelDto: {
             /**
-             * @description The tier the evidence supports. SELF is not a verification — use unverify to drop a channel back.
+             * @description The tier the evidence supports. SELF is not a verification - use unverify to drop a channel back.
              * @example SCREENSHOT
              * @enum {string}
              */
@@ -1960,7 +1960,7 @@ export interface components {
             payments: components["schemas"]["GatewayPaymentDto"][];
         };
         ExposureReportDto: {
-            /** @description Total owed to promoters (Σ PROMOTER_AVAILABLE) — fully backed by settled escrow. */
+            /** @description Total owed to promoters (Σ PROMOTER_AVAILABLE) - fully backed by settled escrow. */
             promoter_payable: components["schemas"]["MoneyDto"];
             /** @description Requested/approved payouts not yet paid. */
             in_flight_withdrawals: components["schemas"]["MoneyDto"];
@@ -1992,7 +1992,7 @@ export interface components {
         };
         RateConfigUpdateDto: {
             /**
-             * @description RPM — kobo per 1,000 effective views.
+             * @description RPM - kobo per 1,000 effective views.
              * @example 3000
              */
             rpm_minor?: number;
@@ -2047,15 +2047,15 @@ export interface components {
             channel: components["schemas"]["CandidateChannelDto"];
             assignments_this_week: number;
             max_campaigns_per_week: number;
-            /** @description Performance-weighted match score, 0–1 (ALGORITHMS.md §7). */
+            /** @description Performance-weighted match score, 0-1 (ALGORITHMS.md §7). */
             match_score: number;
             /** @description match_score as a whole-percent "Fit %". */
             fit_pct: number;
-            /** @description Per-role capability, 0–100. */
+            /** @description Per-role capability, 0-100. */
             capability: number;
             /** @example Established */
             capability_tier: string;
-            /** @description Reliability, 0–1. */
+            /** @description Reliability, 0-1. */
             reliability: number;
         };
         SendOffersDto: {
@@ -2077,7 +2077,7 @@ export interface components {
             /** Format: date-time */
             expires_at: string;
             status: string;
-            /** @description Frozen match "Fit %" (0–100) this offer was ranked at, or null for legacy offers. */
+            /** @description Frozen match "Fit %" (0-100) this offer was ranked at, or null for legacy offers. */
             fit_pct: Record<string, never> | null;
         };
         AssignmentDto: {
@@ -2188,7 +2188,7 @@ export interface components {
              */
             offers_accepted: number;
             /**
-             * @description accepted ÷ sent, 0–1. 0 when none sent.
+             * @description accepted ÷ sent, 0-1. 0 when none sent.
              * @example 0.71
              */
             acceptance_rate: number;
@@ -2220,7 +2220,7 @@ export interface components {
             /** Format: uuid */
             assignment_id: string;
             /**
-             * @description Always PENDING on creation — nothing auto-approves.
+             * @description Always PENDING on creation - nothing auto-approves.
              * @enum {string}
              */
             verdict: "PENDING" | "APPROVED" | "REJECTED";
@@ -2242,7 +2242,7 @@ export interface components {
             submitted_at: string;
         };
         WalletDto: {
-            /** @description Derived from ledger postings — there is no balance column. */
+            /** @description Derived from ledger postings - there is no balance column. */
             available: components["schemas"]["MoneyDto"];
             /** @description Requested or approved but not yet paid. */
             pending_withdrawal: components["schemas"]["MoneyDto"];
@@ -2254,7 +2254,7 @@ export interface components {
              */
             can_withdraw: boolean;
             /**
-             * @description KYC gate for payout — must be VERIFIED before a withdrawal is approved.
+             * @description KYC gate for payout - must be VERIFIED before a withdrawal is approved.
              * @enum {string}
              */
             kyc_status: "NONE" | "PENDING" | "VERIFIED" | "REJECTED";

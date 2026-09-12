@@ -18,9 +18,9 @@ const schema = z.object({
   full_name: z.string().min(2, 'Enter your full name'),
   org_name: z.string().min(2, 'Enter your business name'),
   email: z.string().email('Enter a valid email'),
-  // E.164. The design labels this "WhatsApp" — the API sends the OTP here.
+  // E.164. The design labels this "WhatsApp" - the API sends the OTP here.
   phone_e164: z.string().regex(/^\+[1-9]\d{7,14}$/, 'Use international format, e.g. +2348012345678'),
-  // The API minimum is 10 (the mockup's "8" is stale — see the client README).
+  // The API minimum is 10 (the mockup's "8" is stale - see the client README).
   password: z.string().min(10, 'At least 10 characters'),
   accept: z.literal(true, { errorMap: () => ({ message: 'Accept the terms to continue' }) }),
 });

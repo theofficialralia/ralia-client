@@ -42,7 +42,7 @@ const GENDERS = [
   { label: 'Men', value: ['MALE'] },
   { label: 'Both', value: [] as string[] },
 ];
-// Multi-select gender options — no "Both" (selecting neither, or both, = everyone).
+// Multi-select gender options - no "Both" (selecting neither, or both, = everyone).
 const GENDER_OPTIONS = [
   { label: 'Women', value: 'FEMALE' },
   { label: 'Men', value: 'MALE' },
@@ -60,8 +60,12 @@ const PLATFORMS = [
   { label: 'Facebook', value: 'FACEBOOK' },
 ];
 
+// Picking in-person promotion is a managed service - it leaves the automated flow
+// and Ralia's team arranges it (like "Design one for me").
+const PHYSICAL_LABEL = 'Physical (In-person)';
+
 const ROLE_CARDS = [
-  { value: 'DISTRIBUTOR', title: 'Share it as-is', tag: 'best for visibility', body: 'They post your content on their socials exactly as provided — nothing extra.' },
+  { value: 'DISTRIBUTOR', title: 'Share it as-is', tag: 'best for visibility', body: 'They post your content on their socials exactly as provided - nothing extra.' },
   { value: 'CREATOR', title: 'Create something new', body: 'They build original content about your product from your brief and assets.' },
   { value: 'PARTICIPATOR', title: 'Do a set task', body: 'They complete a specific task you assign e.g. store visits, flyers, surveys, reviews.' },
   { value: 'INFLUENCER', title: 'Reach a bigger audience', body: 'We hand-match you with a high-profile creator for a collab post.' },
@@ -82,9 +86,9 @@ const TASK_TYPES_OFFLINE = [
   'Mystery Shopping/Store Audit/Store Walk-ins',
   'Other Tasks',
 ];
-const BUDGET_BUCKETS = ['Under ₦1M', '₦1M – ₦2M', '₦2M – ₦3M', '₦3M – ₦5M', '₦5M+'];
-const FOLLOWING_SIZES = ['10k – 50k (micro)', '50k – 100k', '100k – 500k', '500k – 1M', '1M+ (celebrity)'];
-const AUDIENCE_REACH = ['10k – 50k', '50k – 100k', '100k – 500k', '500k – 1M', '1M+'];
+const BUDGET_BUCKETS = ['Under ₦1M', '₦1M - ₦2M', '₦2M - ₦3M', '₦3M - ₦5M', '₦5M+'];
+const FOLLOWING_SIZES = ['10k - 50k (micro)', '50k - 100k', '100k - 500k', '500k - 1M', '1M+ (celebrity)'];
+const AUDIENCE_REACH = ['10k - 50k', '50k - 100k', '100k - 500k', '500k - 1M', '1M+'];
 
 type State = {
   name: string; objective: string; description: string; destination_url: string;
@@ -113,7 +117,7 @@ const initial: State = {
   contentType: '', taskMode: '', taskTypes: [], budgetBucket: '', followingSize: '', audienceReach: '',
 };
 
-// A placeholder slot count for the brief create — the real count is set at the
+// A placeholder slot count for the brief create - the real count is set at the
 // Quote step (commitPlan), driven by budget and the category floor.
 const PLACEHOLDER_SLOTS = 5;
 
@@ -129,8 +133,8 @@ function NewCampaignInner() {
   const [error, setError] = useState<string | null>(null);
   const [hydrating, setHydrating] = useState(!!resumeId);
   // A managed, high-touch path was chosen (Ralia designs the creative, or hand-matches
-  // an influencer) — the automated wizard stops and we hand off to the team by email.
-  const [managed, setManaged] = useState<null | 'DESIGN' | 'INFLUENCER'>(null);
+  // an influencer) - the automated wizard stops and we hand off to the team by email.
+  const [managed, setManaged] = useState<null | 'DESIGN' | 'INFLUENCER' | 'PHYSICAL'>(null);
 
   const set = (patch: Partial<State>) => setS((prev) => ({ ...prev, ...patch }));
 
@@ -156,7 +160,7 @@ function NewCampaignInner() {
 
   async function saveBrief() {
     if (!s.name.trim()) return setError('Give your campaign a name.');
-    // The destination link is always optional — some owners just upload creative for
+    // The destination link is always optional - some owners just upload creative for
     // promoters to post. If given, it must be a valid URL.
     const hasDestination = /^https?:\/\//.test(s.destination_url);
     if (s.destination_url.trim() && !hasDestination) return setError('That destination link isn’t a valid URL (https://…).');
@@ -193,7 +197,7 @@ function NewCampaignInner() {
     if (!campaignId) return;
     if (!s.creativeMode) return setError('Choose whether you have creative or want Ralia to design it.');
     // Files are optional here (you can add them now or later, or you may already
-    // have uploaded some on a resumed draft) — only the choice of mode is required.
+    // have uploaded some on a resumed draft) - only the choice of mode is required.
     setBusy(true); setError(null);
     try {
       if (s.creativeMode === 'HAVE') {
@@ -205,7 +209,7 @@ function NewCampaignInner() {
         }
         await api.patch(`/v1/campaigns/${campaignId}`, { needs_creative: false });
       } else {
-        // "Design one for me" is a managed service — Ralia's team makes the creative.
+        // "Design one for me" is a managed service - Ralia's team makes the creative.
         // It leaves the automated flow here and we reach out by email/WhatsApp.
         await api.patch(`/v1/campaigns/${campaignId}`, { needs_creative: true, design_brief: s.designBrief || undefined });
         setManaged('DESIGN');
@@ -221,10 +225,12 @@ function NewCampaignInner() {
 
   async function saveTargeting() {
     if (!campaignId) return;
+    // In-person promotion is a managed service - hand off to the team by email.
+    if (s.platforms.includes(PHYSICAL_LABEL)) { setManaged('PHYSICAL'); return; }
     if (!s.role) return setError('Choose who should promote this.');
     setBusy(true); setError(null);
     try {
-      // Location: "Nationwide" (states []) means no state filter — it wins if picked.
+      // Location: "Nationwide" (states []) means no state filter - it wins if picked.
       const selectedLocs = LOCATIONS.filter((l) => s.locations.includes(l.label));
       const states = selectedLocs.some((l) => l.states.length === 0)
         ? []
@@ -245,7 +251,7 @@ function NewCampaignInner() {
         categories: s.categories,
         platforms: PLATFORMS.filter((p) => s.platforms.includes(p.label)).map((p) => p.value),
         roles: [s.role],
-        // Reach per slot comes from the role's category default — no manual input.
+        // Reach per slot comes from the role's category default - no manual input.
       });
       // Persist the per-role task detail (only the fields that apply to this role).
       const offline = s.role === 'PARTICIPATOR' && s.taskMode === 'OFFLINE';
@@ -260,7 +266,7 @@ function NewCampaignInner() {
         },
       });
       setQuote(null);
-      // "Reach a bigger audience" is a managed, hand-matched service — it leaves the
+      // "Reach a bigger audience" is a managed, hand-matched service - it leaves the
       // automated quote/pay flow here and Ralia's team reaches out to arrange it.
       if (s.role === 'INFLUENCER') {
         setManaged('INFLUENCER');
@@ -275,7 +281,7 @@ function NewCampaignInner() {
   }
 
   // Lock in the exact price the client chose: quote freezes that amount as-is and
-  // derives the promoter count from it (governing logic #2 — the price is charged
+  // derives the promoter count from it (governing logic #2 - the price is charged
   // as typed, nothing is snapped).
   async function commitPlan(priceMinor: number) {
     if (!campaignId) return;
@@ -291,7 +297,7 @@ function NewCampaignInner() {
   }
 
   // Pay (Paystack) for the locked quote. Payment funds escrow and sends the campaign
-  // to admin review — it goes live only once an admin approves it.
+  // to admin review - it goes live only once an admin approves it.
   async function pay() {
     if (!campaignId || !quote || !user) return;
     if (!paystackConfigured()) {
@@ -375,7 +381,7 @@ function NewCampaignInner() {
 
 // Client-facing run-length presets. Picking one sets the end date relative to the
 // start (or today). The promoter's own deadline is set a contingency buffer before
-// the end — that's internal and never shown to the client here.
+// the end - that's internal and never shown to the client here.
 const DURATION_PRESETS = [
   { label: '1 day', days: 1 },
   { label: '3 days', days: 3 },
@@ -422,9 +428,9 @@ function Brief({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
   const runDays = s.startsAt && s.endsAt ? dayCount(s.startsAt, s.endsAt) : s.endsAt ? dayCount(todayISO(), s.endsAt) : 0;
   return (
     <div className="space-y-6">
-      <Header title="Write the brief." subtitle="Promoters will see this. Keep it clear — what to say, do and why it matters." />
+      <Header title="Write the brief." subtitle="Promoters will see this. Keep it clear - what to say, do and why it matters." />
       <Field label="Campaign name">
-        <Input value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="Lagos launch — Skinsmith serum" />
+        <Input value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="Lagos launch - Skinsmith serum" />
       </Field>
 
       <div>
@@ -604,7 +610,7 @@ function Assets({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
 }
 
 function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
-  // Every targeting facet is multi-select — toggle a label in/out of its list.
+  // Every targeting facet is multi-select - toggle a label in/out of its list.
   const toggle = (key: 'locations' | 'ageBuckets' | 'genders' | 'languages' | 'categories' | 'platforms', v: string) =>
     set({ [key]: s[key].includes(v) ? s[key].filter((x) => x !== v) : [...s[key], v] } as Partial<State>);
   // "All X" = no restriction on that facet (empty list). Clicking it clears the row.
@@ -613,7 +619,7 @@ function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
   return (
     <div className="space-y-7">
       <div className="flex items-start justify-between gap-4">
-        <Header title="Target the right people." subtitle="Pick as many as you like in each row — the quote on the next screen moves live with every choice." />
+        <Header title="Target the right people." subtitle="Pick as many as you like in each row - the quote on the next screen moves live with every choice." />
         <a
           href="https://wa.me/2348139376563"
           target="_blank"
@@ -628,12 +634,12 @@ function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
       <ChipMulti label="Age range" options={AGE_BUCKETS.map((a) => a.label)} value={s.ageBuckets} onToggle={(v) => toggle('ageBuckets', v)} allLabel="All ages" onClear={() => clear('ageBuckets')} />
       <ChipMulti label="Gender" options={GENDER_OPTIONS.map((g) => g.label)} value={s.genders} onToggle={(v) => toggle('genders', v)} allLabel="All genders" onClear={() => clear('genders')} />
       <ChipMulti label="Language" options={LANGUAGES} value={s.languages} onToggle={(v) => toggle('languages', v)} allLabel="All languages" onClear={() => clear('languages')} />
-      <ChipMulti label="Category of interest" options={CATEGORIES} value={s.categories} onToggle={(v) => toggle('categories', v)} allLabel="All categories" onClear={() => clear('categories')} />
-      <ChipMulti label="Where should they promote this?" options={PLATFORMS.map((p) => p.label)} value={s.platforms} onToggle={(v) => toggle('platforms', v)} allLabel="Anywhere" onClear={() => clear('platforms')} />
+      <ChipMulti label="Category of interest" options={CATEGORIES} value={s.categories} onToggle={(v) => toggle('categories', v)} allLabel="Any category" onClear={() => clear('categories')} />
+      <ChipMulti label="Where should they promote this?" options={[...PLATFORMS.map((p) => p.label), PHYSICAL_LABEL]} value={s.platforms} onToggle={(v) => toggle('platforms', v)} allLabel="Anywhere" onClear={() => clear('platforms')} />
 
       <div>
         <p className="text-[15px] font-semibold text-ink">Who should promote this?</p>
-        <p className="mt-0.5 text-[13.5px] text-muted">Tell us what you need — we&apos;ll match the right kind of promoter automatically. No jargon required.</p>
+        <p className="mt-0.5 text-[13.5px] text-muted">Tell us what you need - we&apos;ll match the right kind of promoter automatically. No jargon required.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {ROLE_CARDS.map((r) => {
             const on = s.role === r.value;
@@ -708,7 +714,7 @@ function RoleConfigPanel({ s, set }: { s: State; set: (p: Partial<State>) => voi
 
 const MAX_BUDGET_MINOR = 500_000_000; // ₦5,000,000
 
-/** Instant client-side naira from kobo — the price is exact, so the headline never waits on the server. */
+/** Instant client-side naira from kobo - the price is exact, so the headline never waits on the server. */
 function nairaFromMinor(minor: number): string {
   return `₦${Math.round(minor / 100).toLocaleString('en-NG')}`;
 }
@@ -718,7 +724,7 @@ function QuoteStep({ campaignId, quote, committing, onCommit, onDirty }: {
   onCommit: (priceMinor: number) => void; onDirty: () => void;
 }) {
   const [plan, setPlan] = useState<CampaignPlan | null>(null);
-  // The exact price the client is spending, in kobo — updated instantly on every
+  // The exact price the client is spending, in kobo - updated instantly on every
   // slider tick so the headline is smooth; the server only re-derives promoters/reach.
   const [price, setPrice] = useState<number | null>(null);
   const [custom, setCustom] = useState('');
@@ -755,7 +761,7 @@ function QuoteStep({ campaignId, quote, committing, onCommit, onDirty }: {
   if (loading || !plan || price == null) {
     return (
       <div>
-        <Header title="Set your budget." subtitle="Name your price — we show exactly how many promoters and how much reach it buys." />
+        <Header title="Set your budget." subtitle="Name your price - we show exactly how many promoters and how much reach it buys." />
         <div className="py-10 text-center text-muted">{err ?? 'Pricing your campaign…'}</div>
       </div>
     );
@@ -782,7 +788,7 @@ function QuoteStep({ campaignId, quote, committing, onCommit, onDirty }: {
 
   return (
     <div>
-      <Header title="Set your budget." subtitle="Name your price — we show exactly how many promoters and how much reach it buys." />
+      <Header title="Set your budget." subtitle="Name your price - we show exactly how many promoters and how much reach it buys." />
 
       <div className="mt-3 rounded-3xl border border-rule bg-paper p-6 sm:p-8">
         <p className="text-[14px] text-muted">You&apos;ll spend</p>
@@ -831,7 +837,7 @@ function QuoteStep({ campaignId, quote, committing, onCommit, onDirty }: {
       <div className="mt-5">
         {locked ? (
           <div className="rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] font-semibold text-brand-700">
-            ✓ Locked in at {quote!.price.amount_display} — proceed to payment.
+            ✓ Locked in at {quote!.price.amount_display} - proceed to payment.
           </div>
         ) : (
           <Button className="w-full" loading={committing} disabled={!meetsFloor} onClick={() => onCommit(value)}>
@@ -846,16 +852,21 @@ function QuoteStep({ campaignId, quote, committing, onCommit, onDirty }: {
 // ── Bits ───────────────────────────────────────────────────
 
 /**
- * Terminal screen for the two managed, high-touch services — Ralia's team designs
+ * Terminal screen for the two managed, high-touch services - Ralia's team designs
  * the creative, or hand-matches a high-profile creator. These leave the automated
  * quote/pay flow and are arranged directly with the team by email/WhatsApp.
  */
-function ManagedPathScreen({ kind, onDone }: { kind: 'DESIGN' | 'INFLUENCER'; onDone: () => void }) {
-  const design = kind === 'DESIGN';
-  const title = design ? 'Ralia will design your creative' : 'We’ll hand-match your creator';
-  const body = design
-    ? 'This one’s on us to make. Our design team will craft your poster and caption and send it over — we’ve saved your brief. We’ll email you shortly to finish setting up your campaign.'
-    : 'Reaching a bigger audience is a hand-matched service. Our team will pair you with the right high-profile creator for a collab — we’ve saved your brief and will email you shortly to arrange it.';
+function ManagedPathScreen({ kind, onDone }: { kind: 'DESIGN' | 'INFLUENCER' | 'PHYSICAL'; onDone: () => void }) {
+  const title =
+    kind === 'DESIGN' ? 'Ralia will design your creative'
+    : kind === 'PHYSICAL' ? 'We’ll set up your in-person campaign'
+    : 'We’ll hand-match your creator';
+  const body =
+    kind === 'DESIGN'
+      ? 'This one’s on us to make. Our design team will craft your poster and caption and send it over. We’ve saved your brief and will email you shortly to finish setting up your campaign.'
+      : kind === 'PHYSICAL'
+      ? 'In-person promotion (flyers, activations, street teams) is arranged by our team. We’ve saved your brief and will email you shortly to plan it with you.'
+      : 'Reaching a bigger audience is a hand-matched service. Our team will pair you with the right high-profile creator for a collab. We’ve saved your brief and will email you shortly to arrange it.';
   return (
     <div className="mx-auto max-w-lg py-10 text-center">
       <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-brand/10 text-[28px] text-brand">✦</div>
@@ -875,17 +886,17 @@ function ManagedPathScreen({ kind, onDone }: { kind: 'DESIGN' | 'INFLUENCER'; on
 function Fund({ quote }: { quote: Quote | null }) {
   return (
     <div>
-      <Header title="Fund the campaign" subtitle="Pay securely with Paystack. Your campaign then goes to review — it's live the moment it's approved." />
+      <Header title="Fund the campaign" subtitle="Pay securely with Paystack. Your campaign then goes to review - it's live the moment it's approved." />
       <div className="mt-3 rounded-2xl border border-rule p-6">
         <div className="flex items-baseline justify-between">
           <span className="text-[14px] text-muted">Amount to pay</span>
-          <span className="text-[28px] font-extrabold tracking-tight text-brand">{quote?.price.amount_display ?? '—'}</span>
+          <span className="text-[28px] font-extrabold tracking-tight text-brand">{quote?.price.amount_display ?? '-'}</span>
         </div>
         <div className="mt-5 flex items-center gap-3 rounded-xl bg-wash px-4 py-3 text-[13px] text-muted">
-          Card details are entered in Paystack&apos;s secure window — Ralia never sees your card number.
+          Card details are entered in Paystack&apos;s secure window - Ralia never sees your card number.
         </div>
         <div className="mt-3 rounded-xl bg-wash px-4 py-3 text-[13px] text-muted">
-          After payment your campaign goes to review — we&apos;ll email you the moment it&apos;s approved and live.
+          After payment your campaign goes to review - we&apos;ll email you the moment it&apos;s approved and live.
         </div>
       </div>
     </div>

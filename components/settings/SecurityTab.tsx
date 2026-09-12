@@ -71,16 +71,16 @@ export function SecurityTab() {
         </div>
       </section>
 
-      {/* Delete account — rendered per design, but gated: account deletion cascades
+      {/* Delete account - rendered per design, but gated: account deletion cascades
           into live campaigns and wallet balances and needs a dedicated backend
           path. Left non-destructive until that exists. */}
       <section className="card p-6 sm:p-8">
         <h2 className="text-[19px] font-extrabold tracking-tight text-ink">Delete account</h2>
         <p className="mt-1 text-[13.5px] text-muted">This permanently removes your Ralia account. Before you continue, understand that:</p>
         <ul className="mt-3 space-y-1.5 text-[13.5px] text-body">
-          <li>• All campaigns — live, paused or ended — will stop and cannot be recovered.</li>
+          <li>• All campaigns - live, paused or ended - will stop and cannot be recovered.</li>
           <li>• Your evidence gallery and submission history will be deleted.</li>
-          <li>• Any balance must be withdrawn first — it is not automatically refunded.</li>
+          <li>• Any balance must be withdrawn first - it is not automatically refunded.</li>
           <li>• Promoters with active offers on your campaigns will be notified.</li>
         </ul>
         <div className="mt-6">

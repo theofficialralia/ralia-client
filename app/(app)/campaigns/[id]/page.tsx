@@ -163,9 +163,9 @@ function LifecyclePanel({ campaignId, status, justSubmitted }: {
   if (status === 'PENDING_APPROVAL') {
     return (
       <div className="mt-5 rounded-2xl border border-warn/30 bg-warn-wash px-5 py-4">
-        <p className="text-[15px] font-bold text-warn">{justSubmitted ? 'Payment received — under review ✓' : 'Under review'}</p>
+        <p className="text-[15px] font-bold text-warn">{justSubmitted ? 'Payment received - under review ✓' : 'Under review'}</p>
         <p className="mt-1 text-[13.5px] text-body">
-          Your payment is in. Our team reviews every campaign before it goes live — we&apos;ll email you the moment it&apos;s approved.
+          Your payment is in. Our team reviews every campaign before it goes live - we&apos;ll email you the moment it&apos;s approved.
         </p>
       </div>
     );
@@ -176,7 +176,7 @@ function LifecyclePanel({ campaignId, status, justSubmitted }: {
       <div className="mt-5 rounded-2xl border border-warn/30 bg-warn-wash px-5 py-4">
         <p className="text-[15px] font-bold text-warn">Changes needed before this can go live</p>
         <p className="mt-1 text-[13.5px] text-body">
-          Our team sent this back — check your email for what to fix. Your payment is safe; edit the campaign, then resubmit for review (no need to pay again).
+          Our team sent this back - check your email for what to fix. Your payment is safe; edit the campaign, then resubmit for review (no need to pay again).
         </p>
         <div className="mt-3 flex items-center gap-3">
           <Button onClick={() => resubmit.mutate()} loading={resubmit.isPending}>Resubmit for review</Button>
@@ -189,7 +189,7 @@ function LifecyclePanel({ campaignId, status, justSubmitted }: {
   if (status === 'CANCELLED') {
     return (
       <div className="mt-5 rounded-2xl border border-brand/30 bg-brand/5 px-5 py-4">
-        <p className="text-[15px] font-bold text-brand-700">This campaign was rejected — and refunded</p>
+        <p className="text-[15px] font-bold text-brand-700">This campaign was rejected - and refunded</p>
         <p className="mt-1 text-[13.5px] text-body">
           It didn&apos;t pass review, so it won&apos;t run. Your payment has been refunded to your Ralia balance. Contact support if you think this was a mistake.
         </p>
@@ -246,7 +246,7 @@ function Stat({ label, value, foot }: { label: string; value: string; foot: stri
 function Lightbox({ item, onClose }: { item: EvidenceItem; onClose: () => void }) {
   const [imgOk, setImgOk] = useState(true);
   // image_url is served by the API (/v1/files/:id streams local, redirects to the CDN
-  // otherwise), so any set URL is renderable — fall back only if the load actually fails.
+  // otherwise), so any set URL is renderable - fall back only if the load actually fails.
   const showImage = !!item.image_url && imgOk;
   return (
     <div

@@ -26,7 +26,7 @@ type SocialDetail = { url: string; followers: string };
 /**
  * Optional "Setup your organization" step shown right after OTP verification.
  * The org itself is already created at registration (from the business name), so
- * everything here is optional profile detail — the client can Skip to the
+ * everything here is optional profile detail - the client can Skip to the
  * dashboard and finish it later under Settings.
  */
 export default function SetupPage() {

@@ -38,7 +38,7 @@ function PathCard({ title, accent, body, href }: { title: string; accent: string
 }
 
 // The promoter signup lives in the separate promoter app (its own origin). Set
-// NEXT_PUBLIC_PROMOTER_URL per environment — e.g. https://dev-promoter.ralia.co —
+// NEXT_PUBLIC_PROMOTER_URL per environment - e.g. https://dev-promoter.ralia.co -
 // falling back to :6400 for local dev. Trailing slash trimmed so `${url}/register`
 // never doubles up.
 const PROMOTER_URL = (process.env.NEXT_PUBLIC_PROMOTER_URL ?? 'http://localhost:6400').replace(/\/+$/, '');

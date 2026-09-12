@@ -7,7 +7,7 @@ type Slide = { image: string; quote: string; highlight?: string; author?: string
 
 /**
  * The left brand panel on the auth screens, as an auto-advancing carousel. Drop
- * real images into `public/onboarding/` (slide-1/2/3) — until then each slot falls
+ * real images into `public/onboarding/` (slide-1/2/3) - until then each slot falls
  * back to a branded placeholder, so the slideshow works immediately.
  */
 const SLIDES: Slide[] = [

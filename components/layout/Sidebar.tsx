@@ -14,7 +14,7 @@ const nav = [
 ];
 
 /**
- * Profile completeness — the share of the optional business-profile fields that
+ * Profile completeness - the share of the optional business-profile fields that
  * are filled. Drives the sidebar nudge; hidden once everything is in.
  */
 function profileCompleteness(p: ClientProfile): number {

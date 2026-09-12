@@ -48,7 +48,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           >
             <MenuIcon />
           </button>
-          {/* Global search is a planned feature — hidden until it's wired, rather than
+          {/* Global search is a planned feature - hidden until it's wired, rather than
               showing a box that does nothing. */}
           <div className="ml-auto flex items-center gap-2 sm:gap-3">
             <NotificationBell />

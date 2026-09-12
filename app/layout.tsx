@@ -12,7 +12,7 @@ const urbanist = Urbanist({
 });
 
 export const metadata: Metadata = {
-  title: 'Ralia — Businesses',
+  title: 'Ralia - Businesses',
   description: 'Fund campaigns, reach real audiences through everyday promoters, and see proof of every post.',
 };
 

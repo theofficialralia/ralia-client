@@ -1,6 +1,6 @@
 import Image from 'next/image';
 
-/** Ralia brand mark — the real logo PNG, sized by the parent's className. */
+/** Ralia brand mark - the real logo PNG, sized by the parent's className. */
 export function LogoMark({ className = 'h-9 w-9' }: { className?: string }) {
   return (
     <span className={`relative inline-block ${className}`}>
