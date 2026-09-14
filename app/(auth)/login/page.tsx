@@ -26,9 +26,9 @@ export default function LoginPage() {
   const [notice, setNotice] = useState<string | null>(null);
   // Read from the URL directly (no useSearchParams) to avoid a Suspense boundary.
   useEffect(() => {
-    if (new URLSearchParams(window.location.search).get('reason') === 'idle') {
-      setNotice('You were signed out after 10 minutes of inactivity. Any work in progress was saved.');
-    }
+    const reason = new URLSearchParams(window.location.search).get('reason');
+    if (reason === 'idle') setNotice('You were signed out after 10 minutes of inactivity. Any work in progress was saved.');
+    else if (reason === 'reset') setNotice('Your password was reset. Sign in with your new password.');
   }, []);
   const {
     register,
@@ -72,6 +72,9 @@ export default function LoginPage() {
         <Field label="Password" error={errors.password?.message}>
           <PasswordInput placeholder="Your password" {...register('password')} />
         </Field>
+        <div className="-mt-1 text-right">
+          <Link href="/reset-password" className="text-[13px] font-semibold text-brand-700">Forgot password?</Link>
+        </div>
 
         {serverError && (
           <div className="rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] text-brand-700">
