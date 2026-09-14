@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -23,6 +23,13 @@ export default function LoginPage() {
   const router = useRouter();
   const { setTokens } = useAuth();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  // Read from the URL directly (no useSearchParams) to avoid a Suspense boundary.
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get('reason') === 'idle') {
+      setNotice('You were signed out after 10 minutes of inactivity. Any work in progress was saved.');
+    }
+  }, []);
   const {
     register,
     handleSubmit,
@@ -51,6 +58,12 @@ export default function LoginPage() {
         <h1 className="text-[26px] font-extrabold tracking-tight text-ink">Welcome back.</h1>
         <p className="mt-1.5 text-[14px] text-muted">Sign in to your business account.</p>
       </div>
+
+      {notice && (
+        <div className="mb-4 rounded-xl border border-ok/25 bg-ok/5 px-4 py-3 text-[13px] text-ink">
+          {notice}
+        </div>
+      )}
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <Field label="Business email" error={errors.email?.message}>

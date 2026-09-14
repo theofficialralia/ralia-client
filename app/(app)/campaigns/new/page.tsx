@@ -1,6 +1,6 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api, ApiError, uuid, type Campaign, type CampaignPlan, type Quote } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -121,6 +121,27 @@ const initial: State = {
 // Quote step (commitPlan), driven by budget and the category floor.
 const PLACEHOLDER_SLOTS = 5;
 
+// Local draft of the new-campaign wizard, so nothing typed is lost to a refresh or
+// the 10-minute idle logout. Files can't be serialised, so they're dropped from the
+// draft (the client re-picks them); everything else is restored. Cleared on submit.
+const DRAFT_KEY = 'ralia.campaignDraft';
+type Draft = { step: number; s: Omit<State, 'assetFiles'> };
+function saveDraft(step: number, s: State) {
+  try {
+    const { assetFiles: _drop, ...rest } = s;
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ step, s: rest } satisfies Draft));
+  } catch { /* storage full or unavailable - a draft is a nicety, never fatal */ }
+}
+function readDraft(): Draft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    return raw ? (JSON.parse(raw) as Draft) : null;
+  } catch { return null; }
+}
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+}
+
 function NewCampaignInner() {
   const router = useRouter();
   const { user } = useAuth();
@@ -157,6 +178,24 @@ function NewCampaignInner() {
     })();
     return () => { cancelled = true; };
   }, [resumeId]);
+
+  // Draft persistence (fresh wizard only - a resumed campaign already loads from the API).
+  // Restore once on mount, then mirror every change to localStorage until submit.
+  const draftReady = useRef(false);
+  useEffect(() => {
+    if (resumeId) return; // editing an existing campaign - no local draft
+    const d = readDraft();
+    if (d) {
+      setS((prev) => ({ ...prev, ...d.s, assetFiles: [] }));
+      if (typeof d.step === 'number' && d.step >= 1 && d.step <= 3) setStep(d.step); // never resume into quote/pay
+    }
+    draftReady.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (resumeId || !draftReady.current) return;
+    saveDraft(step, s);
+  }, [resumeId, step, s]);
 
   async function saveBrief() {
     if (!s.name.trim()) return setError('Give your campaign a name.');
@@ -327,6 +366,7 @@ function NewCampaignInner() {
     try {
       await api.post(`/v1/campaigns/${campaignId}/payments/paystack/verify`, { reference }, { idempotencyKey: uuid() });
       // Paid → under review. The client is emailed when it's approved (goes live).
+      clearDraft();
       router.replace(`/campaigns/${campaignId}?submitted=1`);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'We could not confirm the payment. If you were charged, contact support.');
