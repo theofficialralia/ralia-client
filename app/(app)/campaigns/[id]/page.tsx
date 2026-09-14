@@ -10,6 +10,7 @@ import { platformLabel, timeAgo } from '@/lib/format';
 import { objectiveLabel } from '@/lib/campaign-options';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { Spinner } from '@/components/ui/Spinner';
+import { IconCheck, IconDownload, IconExternal, IconPause } from '@/components/brand/icons';
 import { Button } from '@/components/ui/Button';
 import { EvidenceCard } from '@/components/campaigns/EvidenceCard';
 
@@ -52,10 +53,10 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
         </Link>
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" disabled title="Pausing is a fast-follow">
-            ❙❙ Pause
+            <IconPause className="h-4 w-4" /> Pause
           </Button>
           <Button variant="secondary" size="sm" onClick={() => exportReport(data)}>
-            ↓ Export report
+            <IconDownload className="h-4 w-4" /> Export report
           </Button>
         </div>
       </div>
@@ -163,7 +164,10 @@ function LifecyclePanel({ campaignId, status, justSubmitted }: {
   if (status === 'PENDING_APPROVAL') {
     return (
       <div className="mt-5 rounded-2xl border border-warn/30 bg-warn-wash px-5 py-4">
-        <p className="text-[15px] font-bold text-warn">{justSubmitted ? 'Payment received - under review ✓' : 'Under review'}</p>
+        <p className="inline-flex items-center gap-1.5 text-[15px] font-bold text-warn">
+          {justSubmitted && <IconCheck className="h-4 w-4" />}
+          {justSubmitted ? 'Payment received - under review' : 'Under review'}
+        </p>
         <p className="mt-1 text-[13.5px] text-body">
           Your payment is in. Our team reviews every campaign before it goes live - we&apos;ll email you the moment it&apos;s approved.
         </p>
@@ -278,8 +282,8 @@ function Lightbox({ item, onClose }: { item: EvidenceItem; onClose: () => void }
         <div className="flex items-center justify-between px-5 py-4">
           <span className="text-[14px] font-bold text-ink">{item.views.toLocaleString('en-NG')} views</span>
           {item.public_url && (
-            <a href={item.public_url} target="_blank" rel="noreferrer" className="text-[13.5px] font-semibold text-brand-700">
-              View original post ↗
+            <a href={item.public_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13.5px] font-semibold text-brand-700">
+              View original post <IconExternal className="h-3.5 w-3.5" />
             </a>
           )}
         </div>

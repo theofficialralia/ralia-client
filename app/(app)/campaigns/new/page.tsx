@@ -9,6 +9,7 @@ import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, Textarea } from '@/components/ui/Field';
 import { Stepper } from '@/components/campaigns/wizard/Stepper';
+import { IconArrowLeft, IconArrowRight, IconChat, IconCheck, IconClose, IconPhone, IconSparkle, IconUpload } from '@/components/brand/icons';
 import { CATEGORIES } from '@/lib/campaign-options';
 
 // ── Design option sets (labels map to backend values) ─────────
@@ -383,8 +384,8 @@ function NewCampaignInner() {
   return (
     <div className="mx-auto max-w-4xl">
       <div className="flex items-center justify-between">
-        <button onClick={() => router.push('/campaigns')} className="flex items-center gap-2 text-[15px] font-semibold text-muted hover:text-ink">
-          ← Cancel &amp; Return
+        <button onClick={() => router.push('/campaigns')} className="flex items-center gap-1.5 text-[15px] font-semibold text-muted hover:text-ink">
+          <IconArrowLeft className="h-4 w-4" /> Cancel &amp; Return
         </button>
         <span className="text-[13px] text-muted">Step {step} of 5</span>
       </div>
@@ -404,12 +405,12 @@ function NewCampaignInner() {
 
         <div className="mt-7 flex items-center justify-between">
           <Button variant="secondary" onClick={() => (step === 1 ? router.push('/campaigns') : setStep((n) => n - 1))} disabled={busy}>
-            ← Back
+            <IconArrowLeft className="h-4 w-4" /> Back
           </Button>
-          {step === 1 && <Button onClick={saveBrief} loading={busy}>Proceed →</Button>}
-          {step === 2 && <Button onClick={saveAssets} loading={busy}>Proceed →</Button>}
-          {step === 3 && <Button onClick={saveTargeting} loading={busy}>Proceed →</Button>}
-          {step === 4 && <Button onClick={() => setStep(5)} disabled={!quote || busy}>Proceed →</Button>}
+          {step === 1 && <Button onClick={saveBrief} loading={busy}>Proceed <IconArrowRight className="h-4 w-4" /></Button>}
+          {step === 2 && <Button onClick={saveAssets} loading={busy}>Proceed <IconArrowRight className="h-4 w-4" /></Button>}
+          {step === 3 && <Button onClick={saveTargeting} loading={busy}>Proceed <IconArrowRight className="h-4 w-4" /></Button>}
+          {step === 4 && <Button onClick={() => setStep(5)} disabled={!quote || busy}>Proceed <IconArrowRight className="h-4 w-4" /></Button>}
           {step === 5 && <Button onClick={pay} loading={busy}>Pay with Paystack</Button>}
         </div>
       </div>
@@ -606,7 +607,7 @@ function Assets({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
         >
           <input type="file" multiple className="hidden" accept="image/*,video/*,.pdf"
             onChange={(e) => addFiles(e.target.files)} />
-          <span className={`grid h-16 w-16 place-items-center rounded-full text-[22px] ${s.creativeMode === 'HAVE' ? 'bg-brand text-white' : 'bg-wash text-ink'}`}>↑</span>
+          <span className={`grid h-16 w-16 place-items-center rounded-full ${s.creativeMode === 'HAVE' ? 'bg-brand text-white' : 'bg-wash text-ink'}`}><IconUpload className="h-6 w-6" /></span>
           <span className="mt-4 text-[18px] font-bold text-ink">I have creative</span>
           <span className="mt-1 text-[13px] text-muted">Image, video, poster, caption. Multi-file OK.</span>
         </label>
@@ -617,7 +618,7 @@ function Assets({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
             s.creativeMode === 'DESIGN' ? 'border-brand bg-brand/[0.04]' : 'border-rule hover:border-ink/30'
           }`}
         >
-          <span className={`grid h-16 w-16 place-items-center rounded-full text-[22px] ${s.creativeMode === 'DESIGN' ? 'bg-brand text-white' : 'bg-wash text-ink'}`}>✦</span>
+          <span className={`grid h-16 w-16 place-items-center rounded-full ${s.creativeMode === 'DESIGN' ? 'bg-brand text-white' : 'bg-wash text-ink'}`}><IconSparkle className="h-6 w-6" /></span>
           <span className="mt-4 text-[18px] font-bold text-ink">Design one for me</span>
           <span className="mt-1 text-[13px] text-muted">Ralia&apos;s team designs your poster &amp; caption in 24h.</span>
         </button>
@@ -633,7 +634,7 @@ function Assets({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
                 <span className="block truncate text-[14px] font-semibold text-ink">{f.name}</span>
                 <span className="block text-[12px] text-muted">{fileSize(f.size)}</span>
               </span>
-              <button type="button" onClick={() => removeFile(i)} className="shrink-0 text-muted hover:text-ink" aria-label="Remove file">✕</button>
+              <button type="button" onClick={() => removeFile(i)} className="shrink-0 text-muted hover:text-ink" aria-label="Remove file"><IconClose className="h-4 w-4" /></button>
             </div>
           ))}
         </div>
@@ -664,9 +665,9 @@ function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
           href="https://wa.me/2348139376563"
           target="_blank"
           rel="noreferrer"
-          className="hidden shrink-0 rounded-full border border-rule px-4 py-2 text-[13px] font-semibold text-brand-700 transition hover:bg-wash sm:inline-flex"
+          className="hidden shrink-0 items-center gap-1.5 rounded-full border border-rule px-4 py-2 text-[13px] font-semibold text-brand-700 transition hover:bg-wash sm:inline-flex"
         >
-          📞 Need help? Talk to us
+          <IconPhone className="h-4 w-4" /> Need help? Talk to us
         </a>
       </div>
 
@@ -876,8 +877,8 @@ function QuoteStep({ campaignId, quote, committing, onCommit, onDirty }: {
 
       <div className="mt-5">
         {locked ? (
-          <div className="rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] font-semibold text-brand-700">
-            ✓ Locked in at {quote!.price.amount_display} - proceed to payment.
+          <div className="inline-flex items-center gap-1.5 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] font-semibold text-brand-700">
+            <IconCheck className="h-4 w-4" /> Locked in at {quote!.price.amount_display} - proceed to payment.
           </div>
         ) : (
           <Button className="w-full" loading={committing} disabled={!meetsFloor} onClick={() => onCommit(value)}>
@@ -909,12 +910,12 @@ function ManagedPathScreen({ kind, onDone }: { kind: 'DESIGN' | 'INFLUENCER' | '
       : 'Reaching a bigger audience is a hand-matched service. Our team will pair you with the right high-profile creator for a collab. We’ve saved your brief and will email you shortly to arrange it.';
   return (
     <div className="mx-auto max-w-lg py-10 text-center">
-      <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-brand/10 text-[28px] text-brand">✦</div>
+      <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-brand/10 text-brand"><IconSparkle className="h-8 w-8" /></div>
       <h1 className="mt-5 text-[24px] font-extrabold tracking-tight text-ink">{title}</h1>
       <p className="mt-2 text-[14.5px] leading-relaxed text-muted">{body}</p>
       <div className="mt-6 flex flex-col items-center gap-3">
         <a href="https://wa.me/2348139376563" target="_blank" rel="noreferrer" className="w-full">
-          <Button className="w-full">💬 Message us on WhatsApp</Button>
+          <Button className="w-full"><IconChat className="h-4 w-4" /> Message us on WhatsApp</Button>
         </a>
         <a href="mailto:support@ralia.co?subject=Managed%20campaign%20request" className="text-[13.5px] font-semibold text-brand-700">Or email support@ralia.co</a>
         <button onClick={onDone} className="mt-2 text-[13.5px] font-semibold text-muted hover:text-ink">Back to my campaigns</button>

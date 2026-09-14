@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { api, ApiError, type ClientProfile, type ClientSocial } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, Textarea } from '@/components/ui/Field';
+import { IconCheck, IconUpload } from '@/components/brand/icons';
 import { CATEGORIES } from '@/lib/campaign-options';
 
 // Business sector uses the shared Category-of-Interest taxonomy.
@@ -118,7 +119,7 @@ export function BusinessDetailsTab({ profile, onSaved }: { profile: ClientProfil
             disabled={uploadingLogo}
             className="mt-4 inline-flex items-center gap-2 rounded-full border border-rule bg-paper px-4 py-2 text-[13.5px] font-semibold text-ink transition hover:border-ink/30 disabled:opacity-60"
           >
-            {uploadingLogo ? 'Uploading…' : profile.logo_url ? 'Change logo' : '↑ Upload logo'}
+            {uploadingLogo ? 'Uploading…' : profile.logo_url ? 'Change logo' : <><IconUpload className="h-4 w-4" /> Upload logo</>}
           </button>
         </div>
 
@@ -218,7 +219,7 @@ export function BusinessDetailsTab({ profile, onSaved }: { profile: ClientProfil
 
         <div className="mt-6 flex items-center gap-4">
           <Button onClick={save} size="lg" loading={busy}>Save details</Button>
-          {saved && <span className="text-[13.5px] font-semibold text-ok">Saved ✓</span>}
+          {saved && <span className="inline-flex items-center gap-1 text-[13.5px] font-semibold text-ok"><IconCheck className="h-4 w-4" /> Saved</span>}
         </div>
       </section>
     </div>

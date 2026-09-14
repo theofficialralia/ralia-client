@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import { StatusPill } from '@/components/ui/StatusPill';
+import { IconRefresh } from '@/components/brand/icons';
 import { objectiveLabel } from '@/lib/campaign-options';
 import { api, type Campaign, type DashboardRow } from '@/lib/api';
 
@@ -71,10 +72,10 @@ export function CampaignsTable({ rows, empty }: { rows: DashboardRow[]; empty?: 
                           type="button"
                           onClick={() => runAgain.mutate(c.id)}
                           disabled={runAgain.isPending}
-                          className="font-semibold text-muted transition hover:text-ink disabled:opacity-50"
+                          className="inline-flex items-center gap-1.5 font-semibold text-muted transition hover:text-ink disabled:opacity-50"
                           title="Duplicate this campaign into a new draft to run again"
                         >
-                          {runAgain.isPending && runAgain.variables === c.id ? 'Copying…' : '↻ Run again'}
+                          {runAgain.isPending && runAgain.variables === c.id ? 'Copying…' : <><IconRefresh className="h-4 w-4" /> Run again</>}
                         </button>
                       )}
                       <Link href={href} className="inline-flex items-center gap-1 font-semibold text-brand-700">
