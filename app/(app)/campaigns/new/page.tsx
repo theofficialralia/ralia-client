@@ -9,8 +9,9 @@ import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, Textarea } from '@/components/ui/Field';
 import { Stepper } from '@/components/campaigns/wizard/Stepper';
+import { LogoMark } from '@/components/brand/Logo';
 import { IconArrowLeft, IconArrowRight, IconChat, IconCheck, IconClose, IconPhone, IconSparkle, IconUpload } from '@/components/brand/icons';
-import { CATEGORIES } from '@/lib/campaign-options';
+import { CATEGORIES, objectiveLabel } from '@/lib/campaign-options';
 
 // ── Design option sets (labels map to backend values) ─────────
 
@@ -397,7 +398,7 @@ function NewCampaignInner() {
         {step === 2 && <Assets s={s} set={set} />}
         {step === 3 && <Targeting s={s} set={set} />}
         {step === 4 && campaignId && <QuoteStep campaignId={campaignId} quote={quote} committing={busy} onCommit={commitPlan} onDirty={() => setQuote(null)} />}
-        {step === 5 && <Fund quote={quote} />}
+        {step === 5 && <Fund quote={quote} s={s} />}
 
         {error && (
           <div className="mt-5 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] text-brand-700">{error}</div>
@@ -924,22 +925,97 @@ function ManagedPathScreen({ kind, onDone }: { kind: 'DESIGN' | 'INFLUENCER' | '
   );
 }
 
-function Fund({ quote }: { quote: Quote | null }) {
+function Fund({ quote, s }: { quote: Quote | null; s: State }) {
+  const posts = computePosts(s);
+  const cadenceLabel = posts > 1 ? `${posts} posts · ${s.cadence.charAt(0) + s.cadence.slice(1).toLowerCase().replace('_', '-')}` : 'One-off post';
+  const runWindow = s.startsAt || s.endsAt
+    ? `${s.startsAt ? fmtShortDate(s.startsAt) : 'On approval'} → ${s.endsAt ? fmtShortDate(s.endsAt) : 'Open'}`
+    : 'Starts on approval · no fixed end';
+  const creative = s.creativeMode === 'DESIGN'
+    ? 'Ralia designs your creative'
+    : s.assetFiles.length > 0
+      ? `${s.assetFiles.length} file${s.assetFiles.length === 1 ? '' : 's'} uploaded`
+      : 'No creative uploaded';
+  const audience: string[] = [
+    ...s.locations, ...s.ageBuckets, ...s.genders, ...s.languages, ...s.categories, ...s.platforms,
+  ];
+
   return (
     <div>
-      <Header title="Fund the campaign" subtitle="Pay securely with Paystack. Your campaign then goes to review - it's live the moment it's approved." />
-      <div className="mt-3 rounded-2xl border border-rule p-6">
-        <div className="flex items-baseline justify-between">
-          <span className="text-[14px] text-muted">Amount to pay</span>
-          <span className="text-[28px] font-extrabold tracking-tight text-brand">{quote?.price.amount_display ?? '-'}</span>
+      <Header title="Review &amp; fund" subtitle="Here's exactly what you're paying for. Pay securely with Paystack - your campaign then goes to review and is live the moment it's approved." />
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_320px]">
+        {/* Branded summary */}
+        <div className="overflow-hidden rounded-2xl border border-rule bg-paper">
+          <div className="flex items-center gap-3 border-b border-rule bg-wash px-5 py-4">
+            <LogoMark className="h-8 w-8" />
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-700">Campaign summary</div>
+              <div className="truncate text-[18px] font-extrabold text-ink">{s.name.trim() || 'Untitled campaign'}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-px bg-rule sm:grid-cols-3">
+            <FundFact label="Objective" value={objectiveLabel(s.objective)} />
+            <FundFact label="Promoters" value={quote ? quote.slots_total.toLocaleString('en-NG') : '-'} />
+            <FundFact label="Target views" value={quote ? `${quote.target_reach.toLocaleString('en-NG')}` : '-'} />
+            <FundFact label="Each promoter earns" value={quote?.promoter_fee.amount_display ?? '-'} />
+            <FundFact label="Schedule" value={cadenceLabel} />
+            <FundFact label="Runs" value={runWindow} />
+          </div>
+
+          <div className="border-t border-rule px-5 py-4">
+            <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">Who sees it</div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {audience.length === 0 ? (
+                <span className="rounded-full bg-wash px-3 py-1 text-[12.5px] font-semibold text-ink">Anyone, nationwide</span>
+              ) : (
+                audience.slice(0, 10).map((a) => (
+                  <span key={a} className="rounded-full bg-wash px-3 py-1 text-[12.5px] font-semibold text-ink">{a}</span>
+                ))
+              )}
+              {audience.length > 10 && <span className="rounded-full bg-wash px-3 py-1 text-[12.5px] font-semibold text-muted">+{audience.length - 10} more</span>}
+            </div>
+          </div>
+
+          <div className="grid gap-px border-t border-rule bg-rule sm:grid-cols-2">
+            <div className="bg-paper px-5 py-4">
+              <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">Creative</div>
+              <div className="mt-1 text-[13.5px] font-semibold text-ink">{creative}</div>
+            </div>
+            <div className="bg-paper px-5 py-4">
+              <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">Destination link</div>
+              <div className="mt-1 truncate text-[13.5px] font-semibold text-ink">{s.destination_url.trim() || 'No link (post only)'}</div>
+            </div>
+          </div>
         </div>
-        <div className="mt-5 flex items-center gap-3 rounded-xl bg-wash px-4 py-3 text-[13px] text-muted">
-          Card details are entered in Paystack&apos;s secure window - Ralia never sees your card number.
-        </div>
-        <div className="mt-3 rounded-xl bg-wash px-4 py-3 text-[13px] text-muted">
-          After payment your campaign goes to review - we&apos;ll email you the moment it&apos;s approved and live.
+
+        {/* Pay box */}
+        <div className="h-max rounded-2xl border border-rule bg-paper p-5">
+          <div className="text-[13px] text-muted">Amount to pay</div>
+          <div className="mt-1 text-[32px] font-extrabold tracking-tight text-brand">{quote?.price.amount_display ?? '-'}</div>
+          {quote && (
+            <div className="mt-1 text-[12.5px] text-muted">
+              {quote.slots_total.toLocaleString('en-NG')} promoters × {quote.unit_price.amount_display}
+            </div>
+          )}
+          <div className="mt-4 rounded-xl bg-wash px-4 py-3 text-[12.5px] text-muted">
+            Card details are entered in Paystack&apos;s secure window - Ralia never sees your card number.
+          </div>
+          <div className="mt-3 rounded-xl bg-wash px-4 py-3 text-[12.5px] text-muted">
+            After payment your campaign goes to review. We&apos;ll email you a receipt now, and again the moment it&apos;s approved and live.
+          </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function FundFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-paper px-5 py-3.5">
+      <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted">{label}</div>
+      <div className="mt-0.5 text-[14.5px] font-bold text-ink">{value}</div>
     </div>
   );
 }

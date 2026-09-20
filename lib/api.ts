@@ -181,6 +181,7 @@ export type Quote = {
   estimated_reach: number;
   eligible_promoters: number;
   active_filters: number;
+  target_reach: number;
 };
 
 export type Cadence = 'ONE_OFF' | 'DAILY' | 'WEEKLY' | 'CUSTOM';
@@ -231,6 +232,8 @@ export type EvidenceItem = {
   platform: string;
   submitted_at: string;
   views: number;
+  views_verified: boolean;
+  clicks: number;
   verdict: string;
   auto_flag: boolean;
   public_url: string | null;

@@ -58,7 +58,8 @@ export function EvidenceCard({ item, onOpen }: { item: EvidenceItem; onOpen: () 
         </div>
         <div className="shrink-0 text-right">
           <div className="text-[15px] font-bold tabular-nums text-ink">{item.views.toLocaleString('en-NG')}</div>
-          <div className="text-[11.5px] text-muted">views</div>
+          <div className={`text-[11.5px] font-semibold ${item.views_verified ? 'text-ok' : 'text-muted'}`}>{item.views_verified ? 'verified views' : 'reported views'}</div>
+          <div className="text-[10.5px] tabular-nums text-muted">{item.clicks.toLocaleString('en-NG')} link clicks</div>
         </div>
       </div>
     </button>

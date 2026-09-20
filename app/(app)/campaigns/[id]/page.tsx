@@ -109,7 +109,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
           <h2 className="text-[22px] font-extrabold tracking-tight text-ink">
             Evidence gallery · {verified} verified
           </h2>
-          <p className="mt-1 text-[13.5px] text-muted">Every screenshot is a post you paid for. Zoom and filter.</p>
+          <p className="mt-1 text-[13.5px] text-muted">Each card shows the <b className="font-semibold text-ink">views the promoter reported</b> on their post (verified by Ralia at review) — separate from the link clicks we recorded.</p>
         </div>
         {channels.length > 1 && (
           <select
@@ -221,9 +221,9 @@ function exportReport(data: CampaignAnalytics) {
     `${cell('Completed')},${cell(`${data.completed}/${data.slots_total}`)}`,
     '',
     'Proof of promotion',
-    ['Promoter', 'Handle', 'Platform', 'Views', 'Submitted', 'Verdict', 'Link'].map(cell).join(','),
+    ['Promoter', 'Handle', 'Platform', 'Reported views', 'Views verified', 'Link clicks', 'Submitted', 'Verdict', 'Link'].map(cell).join(','),
     ...data.evidence.map((e) =>
-      [e.promoter_name ?? '', e.promoter_handle ?? '', e.platform, e.views, new Date(e.submitted_at).toISOString(), e.verdict, e.public_url ?? '']
+      [e.promoter_name ?? '', e.promoter_handle ?? '', e.platform, e.views, e.views_verified ? 'yes' : 'no', e.clicks, new Date(e.submitted_at).toISOString(), e.verdict, e.public_url ?? '']
         .map(cell)
         .join(','),
     ),
@@ -279,10 +279,20 @@ function Lightbox({ item, onClose }: { item: EvidenceItem; onClose: () => void }
             <span className="text-[13px] text-muted">Screenshot unavailable</span>
           )}
         </div>
-        <div className="flex items-center justify-between px-5 py-4">
-          <span className="text-[14px] font-bold text-ink">{item.views.toLocaleString('en-NG')} views</span>
+        <div className="flex items-end justify-between gap-4 px-5 py-4">
+          <div className="min-w-0">
+            <div className="text-[16px] font-extrabold tabular-nums text-ink">
+              {item.views.toLocaleString('en-NG')} <span className="text-[13px] font-semibold text-muted">views</span>
+            </div>
+            <div className="mt-0.5 text-[12px] text-muted">
+              {item.views_verified
+                ? 'Verified by Ralia from the promoter’s post.'
+                : 'Reported by the promoter — verified at review.'}
+              {' · '}<span className="tabular-nums">{item.clicks.toLocaleString('en-NG')}</span> link click{item.clicks === 1 ? '' : 's'} recorded
+            </div>
+          </div>
           {item.public_url && (
-            <a href={item.public_url} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13.5px] font-semibold text-brand-700">
+            <a href={item.public_url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-[13.5px] font-semibold text-brand-700">
               View original post <IconExternal className="h-3.5 w-3.5" />
             </a>
           )}
