@@ -60,6 +60,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/leaderboard/rules": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How points work
+         * @description The current point values — what earns and what costs points — for a promoter-facing explainer.
+         */
+        get: operations["LeaderboardController_rules"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/notifications": {
         parameters: {
             query?: never;
@@ -1993,6 +2013,48 @@ export interface components {
             /** @description This season’s points grouped by how they were earned. */
             breakdown: components["schemas"]["PointBreakdownDto"][];
         };
+        PointRulesDto: {
+            /**
+             * @description Points for an approved delivery.
+             * @example 50
+             */
+            delivery_completed: number;
+            /**
+             * @description Bonus for delivering on time.
+             * @example 20
+             */
+            on_time: number;
+            /**
+             * @description Bonus for a clean (non-duplicate) proof.
+             * @example 15
+             */
+            quality_clean: number;
+            /**
+             * @description Maximum bonus for over-delivering (at the cap ratio).
+             * @example 60
+             */
+            over_delivery_max: number;
+            /**
+             * @description Over-delivery is rewarded up to this many times the target.
+             * @example 3
+             */
+            over_cap_ratio: number;
+            /**
+             * @description Points lost for a missed post.
+             * @example 40
+             */
+            penalty_no_show: number;
+            /**
+             * @description Points lost for a rejected submission.
+             * @example 20
+             */
+            penalty_rejected: number;
+            /**
+             * @description Points lost for a duplicate proof.
+             * @example 30
+             */
+            penalty_duplicate: number;
+        };
         NotificationDto: {
             /** Format: uuid */
             id: string;
@@ -3332,6 +3394,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MyScoreDto"];
+                };
+            };
+        };
+    };
+    LeaderboardController_rules: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PointRulesDto"];
                 };
             };
         };
