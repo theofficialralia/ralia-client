@@ -1980,6 +1980,11 @@ export interface components {
              */
             season: string;
             /**
+             * Format: date-time
+             * @description When this season ends (null if seasons never reset).
+             */
+            season_ends_at: Record<string, never> | null;
+            /**
              * @description How many promoters have a score this season.
              * @example 128
              */
@@ -3026,6 +3031,11 @@ export interface components {
         AdminLeaderboardDto: {
             /** @example S5 */
             season: string;
+            /**
+             * Format: date-time
+             * @description When this season ends (null if seasons never reset).
+             */
+            season_ends_at: Record<string, never> | null;
             /** @example 128 */
             total: number;
             rows: components["schemas"]["AdminLeaderboardRowDto"][];
