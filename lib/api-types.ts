@@ -1366,6 +1366,50 @@ export interface paths {
         patch: operations["AdminController_updateRateConfig"];
         trace?: never;
     };
+    "/v1/admin/leaderboard-config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Leaderboard rules
+         * @description The tunable point values, multipliers, caps, season length and tier thresholds.
+         */
+        get: operations["AdminController_leaderboardConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update leaderboard rules
+         * @description Only the fields sent change. Audited.
+         */
+        patch: operations["AdminController_updateLeaderboardConfig"];
+        trace?: never;
+    };
+    "/v1/admin/promoters/{id}/points": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Adjust a promoter’s points
+         * @description Award or dock leaderboard points manually. Audited.
+         */
+        post: operations["AdminController_adjustPoints"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/audit-log": {
         parameters: {
             query?: never;
@@ -2880,6 +2924,41 @@ export interface components {
              * @example 500000
              */
             withdrawal_minimum_minor?: number;
+        };
+        LeaderboardConfigUpdateDto: {
+            pts_delivery_completed?: number;
+            pts_on_time?: number;
+            pts_quality_clean?: number;
+            over_base?: number;
+            over_cap_ratio?: number;
+            streak_step?: number;
+            streak_cap?: number;
+            pts_breadth?: number;
+            pts_milestone?: number;
+            penalty_no_show?: number;
+            penalty_rejected?: number;
+            penalty_duplicate?: number;
+            per_campaign_point_cap?: number;
+            mult_creation_hundredths?: number;
+            mult_distribution_hundredths?: number;
+            season_length_days?: number;
+            tier_silver_at?: number;
+            tier_gold_at?: number;
+            tier_platinum_at?: number;
+            /** @example 0.8 */
+            tier_reliability_floor?: number;
+        };
+        AdjustPointsDto: {
+            /**
+             * @description Points to award (positive) or dock (negative).
+             * @example 100
+             */
+            points: number;
+            /**
+             * @description Why — recorded on the audit log and the point event.
+             * @example Compensating a proof lost in review.
+             */
+            reason: string;
         };
         InviteAdminDto: {
             /** @example newadmin@ralia.co */
@@ -5171,6 +5250,76 @@ export interface operations {
         };
         responses: {
             200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminController_leaderboardConfig: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminController_updateLeaderboardConfig: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LeaderboardConfigUpdateDto"];
+            };
+        };
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminController_adjustPoints: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AdjustPointsDto"];
+            };
+        };
+        responses: {
+            201: {
                 headers: {
                     [name: string]: unknown;
                 };
