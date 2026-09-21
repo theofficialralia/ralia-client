@@ -156,6 +156,7 @@ export type Campaign = {
   description: string | null;
   promoter_instructions: string | null;
   destination_url: string | null;
+  min_tier?: 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | null;
   slots_total: number;
   slots_filled: number;
   price: Money | null;

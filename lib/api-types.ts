@@ -2274,6 +2274,11 @@ export interface components {
              */
             destination_url?: string;
             /**
+             * @description Restrict this campaign to promoters at or above a leaderboard tier. Omit for open-to-all.
+             * @enum {string}
+             */
+            min_tier?: "BRONZE" | "SILVER" | "GOLD" | "PLATINUM";
+            /**
              * @description How many promoter slots.
              * @example 12
              */
@@ -2344,6 +2349,11 @@ export interface components {
             description: Record<string, never> | null;
             promoter_instructions: Record<string, never> | null;
             destination_url: Record<string, never>;
+            /**
+             * @description Minimum promoter tier eligible for this campaign, or null for open-to-all.
+             * @enum {string|null}
+             */
+            min_tier: "BRONZE" | "SILVER" | "GOLD" | "PLATINUM" | null;
             slots_total: number;
             slots_filled: number;
             /** @description Human clicks delivered — present on the single-campaign detail. */
@@ -2388,6 +2398,11 @@ export interface components {
             promoter_instructions?: string;
             /** @example https://naijathreads.example/shop */
             destination_url?: string;
+            /**
+             * @description Restrict to promoters at or above a tier. Omit to leave unchanged.
+             * @enum {string}
+             */
+            min_tier?: "BRONZE" | "SILVER" | "GOLD" | "PLATINUM";
             /** @example 12 */
             slots_total?: number;
             role_config?: components["schemas"]["RoleConfigDto"];

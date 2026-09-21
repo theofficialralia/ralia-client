@@ -108,6 +108,8 @@ type State = {
   // Per-role task config
   contentType: string; taskMode: '' | 'ONLINE' | 'OFFLINE'; taskTypes: string[];
   budgetBucket: string; followingSize: string; audienceReach: string;
+  // Restrict to promoters at or above a leaderboard tier. '' = open to all.
+  minTier: '' | 'SILVER' | 'GOLD' | 'PLATINUM';
 };
 
 const initial: State = {
@@ -117,6 +119,7 @@ const initial: State = {
   creativeMode: '', assetFiles: [], designBrief: '',
   locations: [], ageBuckets: [], genders: [], languages: [], categories: [], platforms: [], role: '',
   contentType: '', taskMode: '', taskTypes: [], budgetBucket: '', followingSize: '', audienceReach: '',
+  minTier: '',
 };
 
 // A placeholder slot count for the brief create - the real count is set at the
@@ -305,6 +308,8 @@ function NewCampaignInner() {
           following_size: s.role === 'INFLUENCER' ? s.followingSize || undefined : undefined,
           audience_reach: offline ? s.audienceReach || undefined : undefined,
         },
+        // Tier gate — only send when the client narrowed it (empty = open to all).
+        min_tier: s.minTier || undefined,
       });
       setQuote(null);
       // "Reach a bigger audience" is a managed, hand-matched service - it leaves the
@@ -680,6 +685,26 @@ function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
       <ChipMulti label="Where should they promote this?" options={[...PLATFORMS.map((p) => p.label), PHYSICAL_LABEL]} value={s.platforms} onToggle={(v) => toggle('platforms', v)} allLabel="Anywhere" onClear={() => clear('platforms')} />
 
       <div>
+        <p className="text-[15px] font-semibold text-ink">Minimum promoter tier</p>
+        <p className="mt-0.5 text-[13.5px] text-muted">Restrict to your best-ranked promoters. Higher tiers are proven performers, but fewer of them - leave on “Any” to reach everyone.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {([['', 'Any'], ['SILVER', 'Silver+'], ['GOLD', 'Gold+'], ['PLATINUM', 'Platinum']] as const).map(([value, label]) => {
+            const on = s.minTier === value;
+            return (
+              <button
+                key={value || 'ANY'}
+                type="button"
+                onClick={() => set({ minTier: value })}
+                className={`rounded-full border px-4 py-2 text-[13.5px] font-semibold transition ${on ? 'border-ink bg-ink text-paper' : 'border-rule bg-paper text-ink hover:border-ink/30'}`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div>
         <p className="text-[15px] font-semibold text-ink">Who should promote this?</p>
         <p className="mt-0.5 text-[13.5px] text-muted">Tell us what you need - we&apos;ll match the right kind of promoter automatically. No jargon required.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
@@ -962,6 +987,7 @@ function Fund({ quote, s }: { quote: Quote | null; s: State }) {
             <FundFact label="Each promoter earns" value={quote?.promoter_fee.amount_display ?? '-'} />
             <FundFact label="Schedule" value={cadenceLabel} />
             <FundFact label="Runs" value={runWindow} />
+            <FundFact label="Promoter tier" value={s.minTier ? `${s.minTier.charAt(0)}${s.minTier.slice(1).toLowerCase()}+` : 'Any tier'} />
           </div>
 
           <div className="border-t border-rule px-5 py-4">
@@ -1147,6 +1173,7 @@ function hydrateState(prev: State, c: Campaign): State {
     objective: c.objective ?? 'AWARENESS',
     description: c.description ?? '',
     destination_url: c.destination_url ?? '',
+    minTier: c.min_tier && c.min_tier !== 'BRONZE' ? c.min_tier : '',
     startsAt: c.starts_at ? c.starts_at.slice(0, 10) : '',
     endsAt: c.ends_at ? c.ends_at.slice(0, 10) : '',
     cadence: c.cadence ?? 'ONE_OFF',
