@@ -1386,6 +1386,26 @@ export interface paths {
         patch: operations["AdminController_updateRateConfig"];
         trace?: never;
     };
+    "/v1/admin/leaderboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Promoter leaderboard
+         * @description Full season standings — real names, season + lifetime points, tier and streak, ranked.
+         */
+        get: operations["AdminController_leaderboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/admin/leaderboard-config": {
         parameters: {
             query?: never;
@@ -2986,6 +3006,29 @@ export interface components {
              * @example 500000
              */
             withdrawal_minimum_minor?: number;
+        };
+        AdminLeaderboardRowDto: {
+            /** @example 1 */
+            rank: number;
+            /** Format: uuid */
+            promoter_id: string;
+            /** @example Ada Okafor */
+            full_name: Record<string, never> | null;
+            /** @example 640 */
+            season_points: number;
+            /** @example 1820 */
+            lifetime_points: number;
+            /** @enum {string} */
+            tier: "BRONZE" | "SILVER" | "GOLD" | "PLATINUM";
+            /** @example 5 */
+            streak: number;
+        };
+        AdminLeaderboardDto: {
+            /** @example S5 */
+            season: string;
+            /** @example 128 */
+            total: number;
+            rows: components["schemas"]["AdminLeaderboardRowDto"][];
         };
         LeaderboardConfigUpdateDto: {
             pts_delivery_completed?: number;
@@ -5338,6 +5381,30 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+        };
+    };
+    AdminController_leaderboard: {
+        parameters: {
+            query: {
+                limit: number;
+            };
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminLeaderboardDto"];
+                };
             };
         };
     };
