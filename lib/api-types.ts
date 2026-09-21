@@ -20,6 +20,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/v1/leaderboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The season leaderboard
+         * @description Top promoters this season plus the caller’s own ranked row.
+         */
+        get: operations["LeaderboardController_board"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/v1/leaderboard/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * My score
+         * @description Points, rank, tier + progress to the next tier, streak, and a breakdown of how points were earned this season.
+         */
+        get: operations["LeaderboardController_me"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/v1/notifications": {
         parameters: {
             query?: never;
@@ -1831,6 +1871,84 @@ export interface components {
              */
             db: "up" | "down";
         };
+        LeaderboardRowDto: {
+            /** @example 1 */
+            rank: number;
+            /**
+             * @description Privacy-preserving display name (first name + last initial).
+             * @example Ada O.
+             */
+            display_name: string;
+            /** @example 640 */
+            points: number;
+            /** @enum {string} */
+            tier: "BRONZE" | "SILVER" | "GOLD" | "PLATINUM";
+            /**
+             * @description True for the viewer’s own row.
+             * @example false
+             */
+            is_me: boolean;
+        };
+        LeaderboardDto: {
+            /**
+             * @description The current season key.
+             * @example S5
+             */
+            season: string;
+            /**
+             * @description How many promoters have a score this season.
+             * @example 128
+             */
+            total: number;
+            /** @description The top promoters this season, ranked. */
+            top: components["schemas"]["LeaderboardRowDto"][];
+            /** @description The viewer’s own row, if they have a score this season. */
+            me: components["schemas"]["LeaderboardRowDto"] | null;
+        };
+        NextTierDto: {
+            /** @enum {string} */
+            tier: "BRONZE" | "SILVER" | "GOLD" | "PLATINUM";
+            /**
+             * @description Rolling-90 points still needed to reach it.
+             * @example 160
+             */
+            points_to_go: number;
+        };
+        PointBreakdownDto: {
+            /** @enum {string} */
+            type: "DELIVERY_COMPLETED" | "DELIVERED_ON_TIME" | "OVER_DELIVERY" | "QUALITY_CLEAN" | "STREAK_BONUS" | "BREADTH_BONUS" | "MILESTONE" | "PENALTY_NO_SHOW" | "PENALTY_REJECTED" | "PENALTY_DUPLICATE" | "REVERSAL" | "ADJUSTMENT";
+            /** @example 300 */
+            points: number;
+        };
+        MyScoreDto: {
+            /** @example S5 */
+            season: string;
+            /** @example 640 */
+            season_points: number;
+            /** @example 1820 */
+            lifetime_points: number;
+            /**
+             * @description Points in the trailing 90 days — the metric tiers are based on.
+             * @example 640
+             */
+            rolling_90_points: number;
+            /**
+             * @description Rank this season, or null with no score yet.
+             * @example 4
+             */
+            rank: Record<string, never> | null;
+            /** @enum {string} */
+            tier: "BRONZE" | "SILVER" | "GOLD" | "PLATINUM";
+            /** @description The next tier up and how far off it is, or null at the top. */
+            next_tier: components["schemas"]["NextTierDto"] | null;
+            /**
+             * @description Consecutive on-time deliveries.
+             * @example 5
+             */
+            streak: number;
+            /** @description This season’s points grouped by how they were earned. */
+            breakdown: components["schemas"]["PointBreakdownDto"][];
+        };
         NotificationDto: {
             /** Format: uuid */
             id: string;
@@ -3074,6 +3192,52 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponseDto"];
+                };
+            };
+        };
+    };
+    LeaderboardController_board: {
+        parameters: {
+            query: {
+                limit: number;
+            };
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeaderboardDto"];
+                };
+            };
+        };
+    };
+    LeaderboardController_me: {
+        parameters: {
+            query?: never;
+            header?: {
+                /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
+                "Idempotency-Key"?: string;
+            };
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyScoreDto"];
                 };
             };
         };
