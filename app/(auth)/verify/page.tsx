@@ -8,6 +8,7 @@ import { OtpInput } from '@/components/ui/OtpInput';
 import { Spinner } from '@/components/ui/Spinner';
 import { api, ApiError, type Tokens } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { track } from '@/lib/meta-pixel';
 
 function VerifyInner() {
   const router = useRouter();
@@ -34,6 +35,9 @@ function VerifyInner() {
     try {
       const tokens = await api.post<Tokens>('/v1/auth/otp/verify', { phone_e164: phone, code }, { auth: false });
       await setTokens(tokens);
+      // Signup complete — a business account is now active. Browser-only Pixel event
+      // (no server twin, so no event_id needed); tracks client acquisition.
+      track('CompleteRegistration', { content_name: 'client_signup' });
       // New business owners land on the optional "Set up your organisation" step;
       // it is skippable straight through to the dashboard.
       router.replace('/setup');

@@ -3300,6 +3300,14 @@ export interface components {
              * @example RLA-1a2b3c4d-9f2k84b
              */
             reference: string;
+            /** @description Shared event_id for Meta Pixel/CAPI deduplication. */
+            event_id?: string;
+            /** @description The _fbp browser cookie, for Meta match quality. */
+            fbp?: string;
+            /** @description The _fbc browser cookie (from fbclid), for Meta match quality. */
+            fbc?: string;
+            /** @description The page URL the browser Purchase event fired on. */
+            event_source_url?: string;
         };
         PaymentResultDto: {
             /** @example LIVE */
@@ -5943,7 +5951,8 @@ export interface operations {
     PaymentsController_verify: {
         parameters: {
             query?: never;
-            header?: {
+            header: {
+                "user-agent": string;
                 /** @description Required on mutating money endpoints. A UUID the client generates per intent. */
                 "Idempotency-Key"?: string;
             };

@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { api, ApiError, uuid, type Campaign, type CampaignPlan, type Quote } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { loadPaystack, PAYSTACK_PUBLIC_KEY, paystackConfigured } from '@/lib/paystack';
+import { getFbCookies, newEventId, track } from '@/lib/meta-pixel';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, Textarea } from '@/components/ui/Field';
@@ -350,6 +351,11 @@ function NewCampaignInner() {
       return setError('Paystack is not configured. Add NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY to .env.local.');
     }
     setError(null);
+    // One event_id per payment attempt: fired with the browser Purchase and echoed
+    // to the backend so Meta deduplicates the browser + server-side conversion.
+    const eventId = newEventId();
+    const amount = quote.price.amount_minor / 100;
+    track('InitiateCheckout', { currency: 'NGN', value: amount, content_ids: [campaignId] });
     try {
       const paystack = await loadPaystack();
       paystack.setup({
@@ -360,18 +366,26 @@ function NewCampaignInner() {
         ref: `RLA-${campaignId.slice(0, 8)}-${uuid().slice(0, 8)}`,
         metadata: { campaign_id: campaignId },
         onClose: () => setError('Payment window closed before completing.'),
-        callback: (res) => { void confirmPayment(res.reference); },
+        callback: (res) => { void confirmPayment(res.reference, eventId, amount); },
       }).openIframe();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not start payment.');
     }
   }
 
-  async function confirmPayment(reference: string) {
+  async function confirmPayment(reference: string, eventId: string, amount: number) {
     if (!campaignId) return;
     setBusy(true); setError(null);
     try {
-      await api.post(`/v1/campaigns/${campaignId}/payments/paystack/verify`, { reference }, { idempotencyKey: uuid() });
+      const { fbp, fbc } = getFbCookies();
+      await api.post(
+        `/v1/campaigns/${campaignId}/payments/paystack/verify`,
+        { reference, event_id: eventId, fbp, fbc, event_source_url: window.location.href },
+        { idempotencyKey: uuid() },
+      );
+      // Browser Purchase with the SAME event_id — Meta dedupes it against the
+      // server-side Purchase the backend fires on this same verify.
+      track('Purchase', { currency: 'NGN', value: amount, content_ids: [campaignId], content_type: 'product' }, eventId);
       // Paid → under review. The client is emailed when it's approved (goes live).
       clearDraft();
       router.replace(`/campaigns/${campaignId}?submitted=1`);
