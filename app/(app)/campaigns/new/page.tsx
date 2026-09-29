@@ -29,7 +29,6 @@ const LOCATIONS = [
   { label: 'Abuja', states: ['FCT'] },
   { label: 'Port Harcourt', states: ['Rivers'] },
   { label: 'Ibadan', states: ['Oyo'] },
-  { label: 'Nationwide', states: [] as string[] },
 ];
 
 const AGE_BUCKETS = [
@@ -37,7 +36,6 @@ const AGE_BUCKETS = [
   { label: '31-40', min: 31, max: 40 },
   { label: '41-50', min: 41, max: 50 },
   { label: '51-60+', min: 51, max: 100 },
-  { label: 'All ages', min: null, max: null },
 ];
 
 const GENDERS = [
@@ -275,18 +273,14 @@ function NewCampaignInner() {
     if (!s.role) return setError('Choose who should promote this.');
     setBusy(true); setError(null);
     try {
-      // Location: "Nationwide" (states []) means no state filter - it wins if picked.
+      // Location: no state selected = "Any Location" (no state filter).
       const selectedLocs = LOCATIONS.filter((l) => s.locations.includes(l.label));
-      const states = selectedLocs.some((l) => l.states.length === 0)
-        ? []
-        : [...new Set(selectedLocs.flatMap((l) => l.states))];
+      const states = [...new Set(selectedLocs.flatMap((l) => l.states))];
       // Age: the API takes one min/max range, so several buckets span from the lowest
-      // min to the highest max. "All ages" (null bounds) clears the age filter.
-      const selectedAges = AGE_BUCKETS.filter((a) => s.ageBuckets.includes(a.label));
-      const bounded = selectedAges.filter((a) => a.min != null && a.max != null);
-      const hasAllAges = selectedAges.some((a) => a.min == null);
-      const ageMin = hasAllAges || bounded.length === 0 ? undefined : Math.min(...bounded.map((a) => a.min!));
-      const ageMax = hasAllAges || bounded.length === 0 ? undefined : Math.max(...bounded.map((a) => a.max!));
+      // min to the highest max. No bucket selected = all ages (no age filter).
+      const bounded = AGE_BUCKETS.filter((a) => s.ageBuckets.includes(a.label));
+      const ageMin = bounded.length === 0 ? undefined : Math.min(...bounded.map((a) => a.min));
+      const ageMax = bounded.length === 0 ? undefined : Math.max(...bounded.map((a) => a.max));
       await api.put(`/v1/campaigns/${campaignId}/targeting`, {
         states,
         age_min: ageMin,
@@ -691,7 +685,7 @@ function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
         </a>
       </div>
 
-      <ChipMulti label="Location" options={LOCATIONS.map((l) => l.label)} value={s.locations} onToggle={(v) => toggle('locations', v)} allLabel="All locations" onClear={() => clear('locations')} />
+      <ChipMulti label="Location" options={LOCATIONS.map((l) => l.label)} value={s.locations} onToggle={(v) => toggle('locations', v)} allLabel="Any Location" onClear={() => clear('locations')} />
       <ChipMulti label="Age range" options={AGE_BUCKETS.map((a) => a.label)} value={s.ageBuckets} onToggle={(v) => toggle('ageBuckets', v)} allLabel="All ages" onClear={() => clear('ageBuckets')} />
       <ChipMulti label="Gender" options={GENDER_OPTIONS.map((g) => g.label)} value={s.genders} onToggle={(v) => toggle('genders', v)} allLabel="All genders" onClear={() => clear('genders')} />
       <ChipMulti label="Language" options={LANGUAGES} value={s.languages} onToggle={(v) => toggle('languages', v)} allLabel="All languages" onClear={() => clear('languages')} />
@@ -700,7 +694,7 @@ function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
 
       <div>
         <p className="text-[15px] font-semibold text-ink">Minimum promoter tier</p>
-        <p className="mt-0.5 text-[13.5px] text-muted">Restrict to your best-ranked promoters. Higher tiers are proven performers, but fewer of them - leave on “Any” to reach everyone.</p>
+        <p className="mt-0.5 text-[13.5px] text-muted">Select “Any” to reach promoters across the Ralia network, or choose a tier to reach promoters ranked on our leaderboard.</p>
         <div className="mt-3 flex flex-wrap gap-2">
           {([['', 'Any'], ['SILVER', 'Silver+'], ['GOLD', 'Gold+'], ['PLATINUM', 'Platinum']] as const).map(([value, label]) => {
             const on = s.minTier === value;
@@ -1167,12 +1161,12 @@ function ChipMulti({ label, options, value, onToggle, allLabel, onClear }: { lab
 function hydrateState(prev: State, c: Campaign): State {
   const t = c.targeting;
   // Reverse-map the saved targeting arrays back to selected labels (best-effort for
-  // resuming a draft). Location: a bucket is on when all its states are present, or
-  // "Nationwide" when no states are set. Age: match any bucket whose exact bounds are
-  // in the saved range.
+  // resuming a draft). Location: a bucket is on when all its states are present; no
+  // states saved = "Any Location" (no chips selected). Age: match any bucket whose
+  // exact bounds are in the saved range.
   const tStates = t?.states ?? [];
   const locations = t
-    ? LOCATIONS.filter((l) => (l.states.length === 0 ? tStates.length === 0 : l.states.every((st) => tStates.includes(st)))).map((l) => l.label)
+    ? LOCATIONS.filter((l) => l.states.every((st) => tStates.includes(st))).map((l) => l.label)
     : [];
   const tGenders = t?.genders ?? [];
   const genders = GENDER_OPTIONS.filter((g) => tGenders.includes(g.value)).map((g) => g.label);
