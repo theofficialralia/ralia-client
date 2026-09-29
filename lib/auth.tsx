@@ -15,9 +15,13 @@ type AuthState = {
 
 const AuthContext = createContext<AuthState | null>(null);
 
+/** Sign out after this long with no interaction (Victory: "log off after 10 minutes of inactivity"). */
+const IDLE_LOGOUT_MS = 10 * 60 * 1000;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<Me | null>(null);
   const [loading, setLoading] = useState(true);
+  const router = useRouter();
 
   const loadMe = useCallback(async () => {
     if (!session.access) {
@@ -56,6 +60,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     session.clear();
     setUser(null);
   }, []);
+
+  // Idle logout: while signed in, any inactivity longer than IDLE_LOGOUT_MS ends the
+  // session and returns the user to login. Drafts are saved locally as you type
+  // (see the campaign form), so nothing typed is lost when this fires. Timers are
+  // ref-based so activity never re-renders the tree; the listeners are attached once.
+  useEffect(() => {
+    if (!user) return;
+    let timer: ReturnType<typeof setTimeout>;
+    const onIdle = () => {
+      void logout();
+      router.replace('/login?reason=idle');
+    };
+    const reset = () => {
+      clearTimeout(timer);
+      timer = setTimeout(onIdle, IDLE_LOGOUT_MS);
+    };
+    const events: (keyof WindowEventMap)[] = ['mousemove', 'mousedown', 'keydown', 'scroll', 'touchstart'];
+    for (const e of events) window.addEventListener(e, reset, { passive: true });
+    reset();
+    return () => {
+      clearTimeout(timer);
+      for (const e of events) window.removeEventListener(e, reset);
+    };
+  }, [user, logout, router]);
 
   const value = useMemo<AuthState>(
     () => ({ user, loading, refresh: loadMe, setTokens, logout }),

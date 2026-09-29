@@ -26,7 +26,7 @@ type SocialDetail = { url: string; followers: string };
 /**
  * Optional "Setup your organization" step shown right after OTP verification.
  * The org itself is already created at registration (from the business name), so
- * everything here is optional profile detail — the client can Skip to the
+ * everything here is optional profile detail - the client can Skip to the
  * dashboard and finish it later under Settings.
  */
 export default function SetupPage() {
@@ -144,7 +144,7 @@ export default function SetupPage() {
                   aria-pressed={on}
                   onClick={() => toggle(sc.value)}
                   className={`rounded-full px-5 py-2 text-[14px] font-semibold transition ${
-                    on ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+                    on ? 'bg-ink text-paper' : 'border border-rule bg-paper text-ink hover:border-ink/30'
                   }`}
                 >
                   {sc.label}

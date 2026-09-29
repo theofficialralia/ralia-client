@@ -1,15 +1,18 @@
 'use client';
 
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { api, ApiError, uuid, type Campaign, type CampaignPlan, type Quote } from '@/lib/api';
-import { Spinner } from '@/components/ui/Spinner';
 import { useAuth } from '@/lib/auth';
 import { loadPaystack, PAYSTACK_PUBLIC_KEY, paystackConfigured } from '@/lib/paystack';
+import { getFbCookies, newEventId, track } from '@/lib/meta-pixel';
+import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
 import { Field, Input, Textarea } from '@/components/ui/Field';
 import { Stepper } from '@/components/campaigns/wizard/Stepper';
-import { CATEGORIES } from '@/lib/campaign-options';
+import { LogoMark } from '@/components/brand/Logo';
+import { IconArrowLeft, IconArrowRight, IconChat, IconCheck, IconClose, IconPhone, IconSparkle, IconUpload } from '@/components/brand/icons';
+import { CATEGORIES, objectiveLabel } from '@/lib/campaign-options';
 
 // ── Design option sets (labels map to backend values) ─────────
 
@@ -26,7 +29,6 @@ const LOCATIONS = [
   { label: 'Abuja', states: ['FCT'] },
   { label: 'Port Harcourt', states: ['Rivers'] },
   { label: 'Ibadan', states: ['Oyo'] },
-  { label: 'Nationwide', states: [] as string[] },
 ];
 
 const AGE_BUCKETS = [
@@ -34,7 +36,6 @@ const AGE_BUCKETS = [
   { label: '31-40', min: 31, max: 40 },
   { label: '41-50', min: 41, max: 50 },
   { label: '51-60+', min: 51, max: 100 },
-  { label: 'All ages', min: null, max: null },
 ];
 
 const GENDERS = [
@@ -42,7 +43,7 @@ const GENDERS = [
   { label: 'Men', value: ['MALE'] },
   { label: 'Both', value: [] as string[] },
 ];
-// Multi-select gender options — no "Both" (selecting neither, or both, = everyone).
+// Multi-select gender options - no "Both" (selecting neither, or both, = everyone).
 const GENDER_OPTIONS = [
   { label: 'Women', value: 'FEMALE' },
   { label: 'Men', value: 'MALE' },
@@ -60,8 +61,12 @@ const PLATFORMS = [
   { label: 'Facebook', value: 'FACEBOOK' },
 ];
 
+// Picking in-person promotion is a managed service - it leaves the automated flow
+// and Ralia's team arranges it (like "Design one for me").
+const PHYSICAL_LABEL = 'Physical (In-person)';
+
 const ROLE_CARDS = [
-  { value: 'DISTRIBUTOR', title: 'Share it as-is', tag: 'best for visibility', body: 'They post your content on their socials exactly as provided — nothing extra.' },
+  { value: 'DISTRIBUTOR', title: 'Share it as-is', tag: 'best for visibility', body: 'They post your content on their socials exactly as provided - nothing extra.' },
   { value: 'CREATOR', title: 'Create something new', body: 'They build original content about your product from your brief and assets.' },
   { value: 'PARTICIPATOR', title: 'Do a set task', body: 'They complete a specific task you assign e.g. store visits, flyers, surveys, reviews.' },
   { value: 'INFLUENCER', title: 'Reach a bigger audience', body: 'We hand-match you with a high-profile creator for a collab post.' },
@@ -82,9 +87,9 @@ const TASK_TYPES_OFFLINE = [
   'Mystery Shopping/Store Audit/Store Walk-ins',
   'Other Tasks',
 ];
-const BUDGET_BUCKETS = ['Under ₦1M', '₦1M – ₦2M', '₦2M – ₦3M', '₦3M – ₦5M', '₦5M+'];
-const FOLLOWING_SIZES = ['10k – 50k (micro)', '50k – 100k', '100k – 500k', '500k – 1M', '1M+ (celebrity)'];
-const AUDIENCE_REACH = ['10k – 50k', '50k – 100k', '100k – 500k', '500k – 1M', '1M+'];
+const BUDGET_BUCKETS = ['Under ₦1M', '₦1M - ₦2M', '₦2M - ₦3M', '₦3M - ₦5M', '₦5M+'];
+const FOLLOWING_SIZES = ['10k - 50k (micro)', '50k - 100k', '100k - 500k', '500k - 1M', '1M+ (celebrity)'];
+const AUDIENCE_REACH = ['10k - 50k', '50k - 100k', '100k - 500k', '500k - 1M', '1M+'];
 
 type State = {
   name: string; objective: string; description: string; destination_url: string;
@@ -102,6 +107,8 @@ type State = {
   // Per-role task config
   contentType: string; taskMode: '' | 'ONLINE' | 'OFFLINE'; taskTypes: string[];
   budgetBucket: string; followingSize: string; audienceReach: string;
+  // Restrict to promoters at or above a leaderboard tier. '' = open to all.
+  minTier: '' | 'SILVER' | 'GOLD' | 'PLATINUM';
 };
 
 const initial: State = {
@@ -111,11 +118,33 @@ const initial: State = {
   creativeMode: '', assetFiles: [], designBrief: '',
   locations: [], ageBuckets: [], genders: [], languages: [], categories: [], platforms: [], role: '',
   contentType: '', taskMode: '', taskTypes: [], budgetBucket: '', followingSize: '', audienceReach: '',
+  minTier: '',
 };
 
-// A placeholder slot count for the brief create — the real count is set at the
+// A placeholder slot count for the brief create - the real count is set at the
 // Quote step (commitPlan), driven by budget and the category floor.
 const PLACEHOLDER_SLOTS = 5;
+
+// Local draft of the new-campaign wizard, so nothing typed is lost to a refresh or
+// the 10-minute idle logout. Files can't be serialised, so they're dropped from the
+// draft (the client re-picks them); everything else is restored. Cleared on submit.
+const DRAFT_KEY = 'ralia.campaignDraft';
+type Draft = { step: number; s: Omit<State, 'assetFiles'> };
+function saveDraft(step: number, s: State) {
+  try {
+    const { assetFiles: _drop, ...rest } = s;
+    localStorage.setItem(DRAFT_KEY, JSON.stringify({ step, s: rest } satisfies Draft));
+  } catch { /* storage full or unavailable - a draft is a nicety, never fatal */ }
+}
+function readDraft(): Draft | null {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    return raw ? (JSON.parse(raw) as Draft) : null;
+  } catch { return null; }
+}
+function clearDraft() {
+  try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+}
 
 function NewCampaignInner() {
   const router = useRouter();
@@ -128,6 +157,9 @@ function NewCampaignInner() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hydrating, setHydrating] = useState(!!resumeId);
+  // A managed, high-touch path was chosen (Ralia designs the creative, or hand-matches
+  // an influencer) - the automated wizard stops and we hand off to the team by email.
+  const [managed, setManaged] = useState<null | 'DESIGN' | 'INFLUENCER' | 'PHYSICAL'>(null);
 
   const set = (patch: Partial<State>) => setS((prev) => ({ ...prev, ...patch }));
 
@@ -151,9 +183,30 @@ function NewCampaignInner() {
     return () => { cancelled = true; };
   }, [resumeId]);
 
+  // Draft persistence (fresh wizard only - a resumed campaign already loads from the API).
+  // Restore once on mount, then mirror every change to localStorage until submit.
+  const draftReady = useRef(false);
+  useEffect(() => {
+    if (resumeId) return; // editing an existing campaign - no local draft
+    const d = readDraft();
+    if (d) {
+      setS((prev) => ({ ...prev, ...d.s, assetFiles: [] }));
+      if (typeof d.step === 'number' && d.step >= 1 && d.step <= 3) setStep(d.step); // never resume into quote/pay
+    }
+    draftReady.current = true;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+  useEffect(() => {
+    if (resumeId || !draftReady.current) return;
+    saveDraft(step, s);
+  }, [resumeId, step, s]);
+
   async function saveBrief() {
     if (!s.name.trim()) return setError('Give your campaign a name.');
-    if (!/^https?:\/\//.test(s.destination_url)) return setError('Enter a valid destination link (https://…).');
+    // The destination link is always optional - some owners just upload creative for
+    // promoters to post. If given, it must be a valid URL.
+    const hasDestination = /^https?:\/\//.test(s.destination_url);
+    if (s.destination_url.trim() && !hasDestination) return setError('That destination link isn’t a valid URL (https://…).');
     if (s.startsAt && s.endsAt && s.endsAt <= s.startsAt) return setError('The end date must be after the start date.');
     if (s.cadence !== 'ONE_OFF' && !s.endsAt) return setError('Set an end date before choosing a repeating schedule.');
     setBusy(true); setError(null);
@@ -162,7 +215,7 @@ function NewCampaignInner() {
         name: s.name.trim(),
         objective: s.objective,
         description: s.description || undefined,
-        destination_url: s.destination_url,
+        destination_url: hasDestination ? s.destination_url : null,
         slots_total: PLACEHOLDER_SLOTS,
         // Nulls explicitly clear a previously-set window on a resumed draft.
         starts_at: s.startsAt || null,
@@ -187,7 +240,7 @@ function NewCampaignInner() {
     if (!campaignId) return;
     if (!s.creativeMode) return setError('Choose whether you have creative or want Ralia to design it.');
     // Files are optional here (you can add them now or later, or you may already
-    // have uploaded some on a resumed draft) — only the choice of mode is required.
+    // have uploaded some on a resumed draft) - only the choice of mode is required.
     setBusy(true); setError(null);
     try {
       if (s.creativeMode === 'HAVE') {
@@ -199,7 +252,11 @@ function NewCampaignInner() {
         }
         await api.patch(`/v1/campaigns/${campaignId}`, { needs_creative: false });
       } else {
+        // "Design one for me" is a managed service - Ralia's team makes the creative.
+        // It leaves the automated flow here and we reach out by email/WhatsApp.
         await api.patch(`/v1/campaigns/${campaignId}`, { needs_creative: true, design_brief: s.designBrief || undefined });
+        setManaged('DESIGN');
+        return;
       }
       setStep(3);
     } catch (e) {
@@ -211,21 +268,19 @@ function NewCampaignInner() {
 
   async function saveTargeting() {
     if (!campaignId) return;
+    // In-person promotion is a managed service - hand off to the team by email.
+    if (s.platforms.includes(PHYSICAL_LABEL)) { setManaged('PHYSICAL'); return; }
     if (!s.role) return setError('Choose who should promote this.');
     setBusy(true); setError(null);
     try {
-      // Location: "Nationwide" (states []) means no state filter — it wins if picked.
+      // Location: no state selected = "Any Location" (no state filter).
       const selectedLocs = LOCATIONS.filter((l) => s.locations.includes(l.label));
-      const states = selectedLocs.some((l) => l.states.length === 0)
-        ? []
-        : [...new Set(selectedLocs.flatMap((l) => l.states))];
+      const states = [...new Set(selectedLocs.flatMap((l) => l.states))];
       // Age: the API takes one min/max range, so several buckets span from the lowest
-      // min to the highest max. "All ages" (null bounds) clears the age filter.
-      const selectedAges = AGE_BUCKETS.filter((a) => s.ageBuckets.includes(a.label));
-      const bounded = selectedAges.filter((a) => a.min != null && a.max != null);
-      const hasAllAges = selectedAges.some((a) => a.min == null);
-      const ageMin = hasAllAges || bounded.length === 0 ? undefined : Math.min(...bounded.map((a) => a.min!));
-      const ageMax = hasAllAges || bounded.length === 0 ? undefined : Math.max(...bounded.map((a) => a.max!));
+      // min to the highest max. No bucket selected = all ages (no age filter).
+      const bounded = AGE_BUCKETS.filter((a) => s.ageBuckets.includes(a.label));
+      const ageMin = bounded.length === 0 ? undefined : Math.min(...bounded.map((a) => a.min));
+      const ageMax = bounded.length === 0 ? undefined : Math.max(...bounded.map((a) => a.max));
       await api.put(`/v1/campaigns/${campaignId}/targeting`, {
         states,
         age_min: ageMin,
@@ -235,7 +290,7 @@ function NewCampaignInner() {
         categories: s.categories,
         platforms: PLATFORMS.filter((p) => s.platforms.includes(p.label)).map((p) => p.value),
         roles: [s.role],
-        // Reach per slot comes from the role's category default — no manual input.
+        // Reach per slot comes from the role's category default - no manual input.
       });
       // Persist the per-role task detail (only the fields that apply to this role).
       const offline = s.role === 'PARTICIPATOR' && s.taskMode === 'OFFLINE';
@@ -248,8 +303,16 @@ function NewCampaignInner() {
           following_size: s.role === 'INFLUENCER' ? s.followingSize || undefined : undefined,
           audience_reach: offline ? s.audienceReach || undefined : undefined,
         },
+        // Tier gate — only send when the client narrowed it (empty = open to all).
+        min_tier: s.minTier || undefined,
       });
       setQuote(null);
+      // "Reach a bigger audience" is a managed, hand-matched service - it leaves the
+      // automated quote/pay flow here and Ralia's team reaches out to arrange it.
+      if (s.role === 'INFLUENCER') {
+        setManaged('INFLUENCER');
+        return;
+      }
       setStep(4);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not save targeting.');
@@ -258,13 +321,14 @@ function NewCampaignInner() {
     }
   }
 
-  // Lock in the plan the slider settled on: save the slot count, then freeze the price.
-  async function commitPlan(slots: number) {
+  // Lock in the exact price the client chose: quote freezes that amount as-is and
+  // derives the promoter count from it (governing logic #2 - the price is charged
+  // as typed, nothing is snapped).
+  async function commitPlan(priceMinor: number) {
     if (!campaignId) return;
     setBusy(true); setError(null);
     try {
-      await api.patch(`/v1/campaigns/${campaignId}`, { slots_total: slots });
-      const q = await api.post<Quote>(`/v1/campaigns/${campaignId}/quote`);
+      const q = await api.post<Quote>(`/v1/campaigns/${campaignId}/quote`, { price_minor: priceMinor });
       setQuote(q);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not lock in the plan.');
@@ -273,15 +337,22 @@ function NewCampaignInner() {
     }
   }
 
+  // Pay (Paystack) for the locked quote. Payment funds escrow and sends the campaign
+  // to admin review - it goes live only once an admin approves it.
   async function pay() {
     if (!campaignId || !quote || !user) return;
     if (!paystackConfigured()) {
       return setError('Paystack is not configured. Add NEXT_PUBLIC_PAYSTACK_PUBLIC_KEY to .env.local.');
     }
     setError(null);
+    // One event_id per payment attempt: fired with the browser Purchase and echoed
+    // to the backend so Meta deduplicates the browser + server-side conversion.
+    const eventId = newEventId();
+    const amount = quote.price.amount_minor / 100;
+    track('InitiateCheckout', { currency: 'NGN', value: amount, content_ids: [campaignId] });
     try {
       const paystack = await loadPaystack();
-      const handler = paystack.setup({
+      paystack.setup({
         key: PAYSTACK_PUBLIC_KEY,
         email: user.email,
         amount: quote.price.amount_minor,
@@ -289,20 +360,29 @@ function NewCampaignInner() {
         ref: `RLA-${campaignId.slice(0, 8)}-${uuid().slice(0, 8)}`,
         metadata: { campaign_id: campaignId },
         onClose: () => setError('Payment window closed before completing.'),
-        callback: (res) => { void confirmPayment(res.reference); },
-      });
-      handler.openIframe();
+        callback: (res) => { void confirmPayment(res.reference, eventId, amount); },
+      }).openIframe();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not start payment.');
     }
   }
 
-  async function confirmPayment(reference: string) {
+  async function confirmPayment(reference: string, eventId: string, amount: number) {
     if (!campaignId) return;
     setBusy(true); setError(null);
     try {
-      await api.post(`/v1/campaigns/${campaignId}/payments/paystack/verify`, { reference }, { idempotencyKey: uuid() });
-      router.replace(`/campaigns/${campaignId}?funded=1`);
+      const { fbp, fbc } = getFbCookies();
+      await api.post(
+        `/v1/campaigns/${campaignId}/payments/paystack/verify`,
+        { reference, event_id: eventId, fbp, fbc, event_source_url: window.location.href },
+        { idempotencyKey: uuid() },
+      );
+      // Browser Purchase with the SAME event_id — Meta dedupes it against the
+      // server-side Purchase the backend fires on this same verify.
+      track('Purchase', { currency: 'NGN', value: amount, content_ids: [campaignId], content_type: 'product' }, eventId);
+      // Paid → under review. The client is emailed when it's approved (goes live).
+      clearDraft();
+      router.replace(`/campaigns/${campaignId}?submitted=1`);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'We could not confirm the payment. If you were charged, contact support.');
       setBusy(false);
@@ -313,11 +393,13 @@ function NewCampaignInner() {
     return <div className="flex justify-center py-24"><Spinner className="h-8 w-8 text-brand" /></div>;
   }
 
+  if (managed) return <ManagedPathScreen kind={managed} onDone={() => router.push('/campaigns')} />;
+
   return (
     <div className="mx-auto max-w-4xl">
       <div className="flex items-center justify-between">
-        <button onClick={() => router.push('/campaigns')} className="flex items-center gap-2 text-[15px] font-semibold text-muted hover:text-ink">
-          ← Cancel &amp; Return
+        <button onClick={() => router.push('/campaigns')} className="flex items-center gap-1.5 text-[15px] font-semibold text-muted hover:text-ink">
+          <IconArrowLeft className="h-4 w-4" /> Cancel &amp; Return
         </button>
         <span className="text-[13px] text-muted">Step {step} of 5</span>
       </div>
@@ -328,8 +410,8 @@ function NewCampaignInner() {
         {step === 1 && <Brief s={s} set={set} />}
         {step === 2 && <Assets s={s} set={set} />}
         {step === 3 && <Targeting s={s} set={set} />}
-        {step === 4 && campaignId && <QuoteStep campaignId={campaignId} initialSlots={PLACEHOLDER_SLOTS} quote={quote} committing={busy} onCommit={commitPlan} onDirty={() => setQuote(null)} />}
-        {step === 5 && <Fund quote={quote} />}
+        {step === 4 && campaignId && <QuoteStep campaignId={campaignId} quote={quote} committing={busy} onCommit={commitPlan} onDirty={() => setQuote(null)} />}
+        {step === 5 && <Fund quote={quote} s={s} />}
 
         {error && (
           <div className="mt-5 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] text-brand-700">{error}</div>
@@ -337,12 +419,12 @@ function NewCampaignInner() {
 
         <div className="mt-7 flex items-center justify-between">
           <Button variant="secondary" onClick={() => (step === 1 ? router.push('/campaigns') : setStep((n) => n - 1))} disabled={busy}>
-            ← Back
+            <IconArrowLeft className="h-4 w-4" /> Back
           </Button>
-          {step === 1 && <Button onClick={saveBrief} loading={busy}>Proceed →</Button>}
-          {step === 2 && <Button onClick={saveAssets} loading={busy}>Proceed →</Button>}
-          {step === 3 && <Button onClick={saveTargeting} loading={busy}>Proceed →</Button>}
-          {step === 4 && <Button onClick={() => setStep(5)} disabled={!quote || busy}>Proceed →</Button>}
+          {step === 1 && <Button onClick={saveBrief} loading={busy}>Proceed <IconArrowRight className="h-4 w-4" /></Button>}
+          {step === 2 && <Button onClick={saveAssets} loading={busy}>Proceed <IconArrowRight className="h-4 w-4" /></Button>}
+          {step === 3 && <Button onClick={saveTargeting} loading={busy}>Proceed <IconArrowRight className="h-4 w-4" /></Button>}
+          {step === 4 && <Button onClick={() => setStep(5)} disabled={!quote || busy}>Proceed <IconArrowRight className="h-4 w-4" /></Button>}
           {step === 5 && <Button onClick={pay} loading={busy}>Pay with Paystack</Button>}
         </div>
       </div>
@@ -354,7 +436,7 @@ function NewCampaignInner() {
 
 // Client-facing run-length presets. Picking one sets the end date relative to the
 // start (or today). The promoter's own deadline is set a contingency buffer before
-// the end — that's internal and never shown to the client here.
+// the end - that's internal and never shown to the client here.
 const DURATION_PRESETS = [
   { label: '1 day', days: 1 },
   { label: '3 days', days: 3 },
@@ -401,9 +483,9 @@ function Brief({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
   const runDays = s.startsAt && s.endsAt ? dayCount(s.startsAt, s.endsAt) : s.endsAt ? dayCount(todayISO(), s.endsAt) : 0;
   return (
     <div className="space-y-6">
-      <Header title="Write the brief." subtitle="Promoters will see this. Keep it clear — what to say, do and why it matters." />
+      <Header title="Write the brief." subtitle="Promoters will see this. Keep it clear - what to say, do and why it matters." />
       <Field label="Campaign name">
-        <Input value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="Lagos launch — Skinsmith serum" />
+        <Input value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="Lagos launch - Skinsmith serum" />
       </Field>
 
       <div>
@@ -420,8 +502,9 @@ function Brief({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
       <Field label="Description">
         <Textarea value={s.description} onChange={(e) => set({ description: e.target.value })} placeholder="What is this campaign about, and who is it for?" />
       </Field>
-      <Field label="Destination Link">
+      <Field label="Destination Link (optional)">
         <Input value={s.destination_url} onChange={(e) => set({ destination_url: e.target.value })} placeholder="https://" />
+        <p className="mt-1 text-[12px] text-muted">Where clicks should go. Leave blank if promoters should just post your uploaded creative.</p>
       </Field>
 
       <div>
@@ -441,7 +524,7 @@ function Brief({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
                 aria-pressed={on}
                 onClick={() => set({ startsAt: s.startsAt || todayISO(), endsAt: addDaysISO(start, d.days) })}
                 className={`rounded-full px-4 py-2 text-[13.5px] font-semibold transition ${
-                  on ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+                  on ? 'bg-ink text-paper' : 'border border-rule bg-paper text-ink hover:border-ink/30'
                 }`}
               >
                 {d.label}
@@ -538,7 +621,7 @@ function Assets({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
         >
           <input type="file" multiple className="hidden" accept="image/*,video/*,.pdf"
             onChange={(e) => addFiles(e.target.files)} />
-          <span className={`grid h-16 w-16 place-items-center rounded-full text-[22px] ${s.creativeMode === 'HAVE' ? 'bg-brand text-white' : 'bg-wash text-ink'}`}>↑</span>
+          <span className={`grid h-16 w-16 place-items-center rounded-full ${s.creativeMode === 'HAVE' ? 'bg-brand text-white' : 'bg-wash text-ink'}`}><IconUpload className="h-6 w-6" /></span>
           <span className="mt-4 text-[18px] font-bold text-ink">I have creative</span>
           <span className="mt-1 text-[13px] text-muted">Image, video, poster, caption. Multi-file OK.</span>
         </label>
@@ -549,7 +632,7 @@ function Assets({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
             s.creativeMode === 'DESIGN' ? 'border-brand bg-brand/[0.04]' : 'border-rule hover:border-ink/30'
           }`}
         >
-          <span className={`grid h-16 w-16 place-items-center rounded-full text-[22px] ${s.creativeMode === 'DESIGN' ? 'bg-brand text-white' : 'bg-wash text-ink'}`}>✦</span>
+          <span className={`grid h-16 w-16 place-items-center rounded-full ${s.creativeMode === 'DESIGN' ? 'bg-brand text-white' : 'bg-wash text-ink'}`}><IconSparkle className="h-6 w-6" /></span>
           <span className="mt-4 text-[18px] font-bold text-ink">Design one for me</span>
           <span className="mt-1 text-[13px] text-muted">Ralia&apos;s team designs your poster &amp; caption in 24h.</span>
         </button>
@@ -565,7 +648,7 @@ function Assets({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
                 <span className="block truncate text-[14px] font-semibold text-ink">{f.name}</span>
                 <span className="block text-[12px] text-muted">{fileSize(f.size)}</span>
               </span>
-              <button type="button" onClick={() => removeFile(i)} className="shrink-0 text-muted hover:text-ink" aria-label="Remove file">✕</button>
+              <button type="button" onClick={() => removeFile(i)} className="shrink-0 text-muted hover:text-ink" aria-label="Remove file"><IconClose className="h-4 w-4" /></button>
             </div>
           ))}
         </div>
@@ -582,29 +665,56 @@ function Assets({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
 }
 
 function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
-  // Every targeting facet is multi-select — toggle a label in/out of its list.
+  // Every targeting facet is multi-select - toggle a label in/out of its list.
   const toggle = (key: 'locations' | 'ageBuckets' | 'genders' | 'languages' | 'categories' | 'platforms', v: string) =>
     set({ [key]: s[key].includes(v) ? s[key].filter((x) => x !== v) : [...s[key], v] } as Partial<State>);
+  // "All X" = no restriction on that facet (empty list). Clicking it clears the row.
+  const clear = (key: 'locations' | 'ageBuckets' | 'genders' | 'languages' | 'categories' | 'platforms') => set({ [key]: [] } as Partial<State>);
 
   return (
     <div className="space-y-7">
       <div className="flex items-start justify-between gap-4">
-        <Header title="Target the right people." subtitle="Pick as many as you like in each row — the quote on the next screen moves live with every choice." />
-        <span className="hidden shrink-0 rounded-full border border-rule px-4 py-2 text-[13px] font-semibold text-brand-700 sm:inline-flex">
-          📞 Need help? Talk to us
-        </span>
+        <Header title="Target the right people." subtitle="Pick as many as you like in each row - the quote on the next screen moves live with every choice." />
+        <a
+          href="https://wa.me/2348139376563"
+          target="_blank"
+          rel="noreferrer"
+          className="hidden shrink-0 items-center gap-1.5 rounded-full border border-rule px-4 py-2 text-[13px] font-semibold text-brand-700 transition hover:bg-wash sm:inline-flex"
+        >
+          <IconPhone className="h-4 w-4" /> Need help? Talk to us
+        </a>
       </div>
 
-      <ChipMulti label="Location" options={LOCATIONS.map((l) => l.label)} value={s.locations} onToggle={(v) => toggle('locations', v)} />
-      <ChipMulti label="Age range" options={AGE_BUCKETS.map((a) => a.label)} value={s.ageBuckets} onToggle={(v) => toggle('ageBuckets', v)} />
-      <ChipMulti label="Gender" options={GENDER_OPTIONS.map((g) => g.label)} value={s.genders} onToggle={(v) => toggle('genders', v)} />
-      <ChipMulti label="Language" options={LANGUAGES} value={s.languages} onToggle={(v) => toggle('languages', v)} />
-      <ChipMulti label="Category of interest" options={CATEGORIES} value={s.categories} onToggle={(v) => toggle('categories', v)} />
-      <ChipMulti label="Platform" options={PLATFORMS.map((p) => p.label)} value={s.platforms} onToggle={(v) => toggle('platforms', v)} />
+      <ChipMulti label="Location" options={LOCATIONS.map((l) => l.label)} value={s.locations} onToggle={(v) => toggle('locations', v)} allLabel="Any Location" onClear={() => clear('locations')} />
+      <ChipMulti label="Age range" options={AGE_BUCKETS.map((a) => a.label)} value={s.ageBuckets} onToggle={(v) => toggle('ageBuckets', v)} allLabel="All ages" onClear={() => clear('ageBuckets')} />
+      <ChipMulti label="Gender" options={GENDER_OPTIONS.map((g) => g.label)} value={s.genders} onToggle={(v) => toggle('genders', v)} allLabel="All genders" onClear={() => clear('genders')} />
+      <ChipMulti label="Language" options={LANGUAGES} value={s.languages} onToggle={(v) => toggle('languages', v)} allLabel="All languages" onClear={() => clear('languages')} />
+      <ChipMulti label="Category of interest" options={CATEGORIES} value={s.categories} onToggle={(v) => toggle('categories', v)} allLabel="Any category" onClear={() => clear('categories')} />
+      <ChipMulti label="Where should they promote this?" options={[...PLATFORMS.map((p) => p.label), PHYSICAL_LABEL]} value={s.platforms} onToggle={(v) => toggle('platforms', v)} allLabel="Anywhere" onClear={() => clear('platforms')} />
+
+      <div>
+        <p className="text-[15px] font-semibold text-ink">Minimum promoter tier</p>
+        <p className="mt-0.5 text-[13.5px] text-muted">Select “Any” to reach promoters across the Ralia network, or choose a tier to reach promoters ranked on our leaderboard.</p>
+        <div className="mt-3 flex flex-wrap gap-2">
+          {([['', 'Any'], ['SILVER', 'Silver+'], ['GOLD', 'Gold+'], ['PLATINUM', 'Platinum']] as const).map(([value, label]) => {
+            const on = s.minTier === value;
+            return (
+              <button
+                key={value || 'ANY'}
+                type="button"
+                onClick={() => set({ minTier: value })}
+                className={`rounded-full border px-4 py-2 text-[13.5px] font-semibold transition ${on ? 'border-ink bg-ink text-paper' : 'border-rule bg-paper text-ink hover:border-ink/30'}`}
+              >
+                {label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
 
       <div>
         <p className="text-[15px] font-semibold text-ink">Who should promote this?</p>
-        <p className="mt-0.5 text-[13.5px] text-muted">Tell us what you need — we&apos;ll match the right kind of promoter automatically. No jargon required.</p>
+        <p className="mt-0.5 text-[13.5px] text-muted">Tell us what you need - we&apos;ll match the right kind of promoter automatically. No jargon required.</p>
         <div className="mt-3 grid gap-3 sm:grid-cols-2">
           {ROLE_CARDS.map((r) => {
             const on = s.role === r.value;
@@ -614,13 +724,13 @@ function Targeting({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
                 type="button"
                 onClick={() => set({ role: r.value })}
                 className={`rounded-2xl border p-5 text-left transition ${
-                  on ? 'border-ink bg-ink text-white' : 'border-rule bg-paper hover:border-ink/30'
+                  on ? 'border-ink bg-ink text-paper' : 'border-rule bg-paper hover:border-ink/30'
                 }`}
               >
                 <div className="text-[16px] font-bold">
-                  {r.title}{r.tag ? <span className={on ? 'text-white/70' : 'text-muted'}> ({r.tag})</span> : ''}
+                  {r.title}{r.tag ? <span className={on ? 'text-paper/70' : 'text-muted'}> ({r.tag})</span> : ''}
                 </div>
-                <p className={`mt-1.5 text-[13px] leading-snug ${on ? 'text-white/70' : 'text-muted'}`}>{r.body}</p>
+                <p className={`mt-1.5 text-[13px] leading-snug ${on ? 'text-paper/70' : 'text-muted'}`}>{r.body}</p>
               </button>
             );
           })}
@@ -679,70 +789,85 @@ function RoleConfigPanel({ s, set }: { s: State; set: (p: Partial<State>) => voi
 
 const MAX_BUDGET_MINOR = 500_000_000; // ₦5,000,000
 
-function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDirty }: {
-  campaignId: string; initialSlots: number; quote: Quote | null; committing: boolean;
-  onCommit: (slots: number) => void; onDirty: () => void;
+/** Instant client-side naira from kobo - the price is exact, so the headline never waits on the server. */
+function nairaFromMinor(minor: number): string {
+  return `₦${Math.round(minor / 100).toLocaleString('en-NG')}`;
+}
+
+function QuoteStep({ campaignId, quote, committing, onCommit, onDirty }: {
+  campaignId: string; quote: Quote | null; committing: boolean;
+  onCommit: (priceMinor: number) => void; onDirty: () => void;
 }) {
   const [plan, setPlan] = useState<CampaignPlan | null>(null);
-  const [budget, setBudget] = useState<number | null>(null);
+  // The exact price the client is spending, in kobo - updated instantly on every
+  // slider tick so the headline is smooth; the server only re-derives promoters/reach.
+  const [price, setPrice] = useState<number | null>(null);
   const [custom, setCustom] = useState('');
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
+  // Initial plan establishes the category floor + defaults and seeds the starting price.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       try {
-        const p = await api.post<CampaignPlan>(`/v1/campaigns/${campaignId}/plan`, { slots: initialSlots });
+        const p = await api.post<CampaignPlan>(`/v1/campaigns/${campaignId}/plan`, {});
         if (!cancelled) {
           setPlan(p);
-          const floorBudget = p.min_slots * p.unit_price.amount_minor;
-          setBudget(Math.max(p.total_price.amount_minor || p.unit_price.amount_minor, floorBudget));
+          setPrice((cur) => cur ?? Math.max(p.floor_minor.amount_minor, p.total_price.amount_minor || p.floor_minor.amount_minor));
         }
       } catch (e) { if (!cancelled) setErr(e instanceof ApiError ? e.message : 'Could not price the campaign.'); }
       finally { if (!cancelled) setLoading(false); }
     })();
     return () => { cancelled = true; };
-  }, [campaignId, initialSlots]);
+  }, [campaignId]);
 
+  // Debounced: re-derive the promoter count + reach for the chosen price. The price
+  // itself is already known locally, so the big number never blocks on this.
   useEffect(() => {
-    if (budget == null) return;
+    if (price == null) return;
     const t = setTimeout(async () => {
-      try { setPlan(await api.post<CampaignPlan>(`/v1/campaigns/${campaignId}/plan`, { budget_minor: budget })); }
+      try { setPlan(await api.post<CampaignPlan>(`/v1/campaigns/${campaignId}/plan`, { price_minor: price })); }
       catch { /* keep the last good plan */ }
-    }, 220);
+    }, 200);
     return () => clearTimeout(t);
-  }, [budget, campaignId]);
+  }, [price, campaignId]);
 
-  if (loading || !plan) {
+  if (loading || !plan || price == null) {
     return (
       <div>
-        <Header title="Your live quote." subtitle="Change any filter and this number moves. This is the honest one." />
+        <Header title="Set your budget." subtitle="Name your price - we show exactly how many promoters and how much reach it buys." />
         <div className="py-10 text-center text-muted">{err ?? 'Pricing your campaign…'}</div>
       </div>
     );
   }
 
-  const unit = plan.unit_price.amount_minor;
-  const minBudget = plan.min_slots * unit;
-  const max = Math.max(MAX_BUDGET_MINOR, minBudget);
-  const value = Math.min(Math.max(budget ?? minBudget, minBudget), max);
-  const locked = quote != null && quote.slots_total === plan.slots;
+  const floor = plan.floor_minor.amount_minor;
+  const max = Math.max(MAX_BUDGET_MINOR, floor);
+  const value = Math.min(Math.max(price, floor), max);
+  const meetsFloor = value >= floor;
+  // Step by roughly one promoter's worth so each notch is meaningful.
+  const stepMinor = Math.max(100, Math.round(floor / Math.max(1, plan.default_promoters)));
+  const locked = quote != null && quote.price.amount_minor === value;
+
+  function setPriceClamped(minor: number) {
+    if (quote) onDirty();
+    setPrice(Math.min(Math.max(minor, floor), max));
+  }
 
   function applyCustom() {
     const naira = Number(custom.replace(/[^0-9]/g, ''));
     if (!naira) return;
-    if (quote) onDirty();
-    setBudget(Math.min(Math.max(naira * 100, minBudget), max));
+    setPriceClamped(naira * 100);
   }
 
   return (
     <div>
-      <Header title="Your live quote." subtitle="Change any filter and this number moves. This is the honest one." />
+      <Header title="Set your budget." subtitle="Name your price - we show exactly how many promoters and how much reach it buys." />
 
       <div className="mt-3 rounded-3xl border border-rule bg-paper p-6 sm:p-8">
-        <p className="text-[14px] text-muted">Estimated price</p>
-        <p className="mt-1 text-[44px] font-extrabold leading-none tracking-tight text-brand">{plan.total_price.amount_display}</p>
+        <p className="text-[14px] text-muted">You&apos;ll spend</p>
+        <p className="mt-1 text-[44px] font-extrabold leading-none tracking-tight text-brand">{nairaFromMinor(value)}</p>
         {plan.posts_required > 1 && (
           <p className="mt-1 text-[13px] font-medium text-muted">
             {plan.slots} promoter{plan.slots === 1 ? '' : 's'} × {plan.posts_required} posts each
@@ -750,9 +875,9 @@ function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDi
         )}
 
         <input
-          type="range" min={minBudget} max={max} step={unit}
+          type="range" min={floor} max={max} step={stepMinor}
           value={value}
-          onChange={(e) => { if (quote) onDirty(); setBudget(Number(e.target.value)); }}
+          onChange={(e) => setPriceClamped(Number(e.target.value))}
           className="mt-5 w-full accent-brand"
         />
         <div className="flex justify-between text-[12px] text-muted">
@@ -760,7 +885,7 @@ function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDi
         </div>
 
         <div className="mt-5">
-          <p className="mb-1.5 text-[14px] font-semibold text-ink">Custom price</p>
+          <p className="mb-1.5 text-[14px] font-semibold text-ink">Or enter an exact amount</p>
           <div className="flex gap-2">
             <Input value={custom} onChange={(e) => setCustom(e.target.value)} placeholder="e.g ₦50,000" />
             <Button variant="secondary" onClick={applyCustom}>Set</Button>
@@ -786,12 +911,12 @@ function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDi
 
       <div className="mt-5">
         {locked ? (
-          <div className="rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] font-semibold text-brand-700">
-            ✓ Locked in at {quote!.price.amount_display} — proceed to payment.
+          <div className="inline-flex items-center gap-1.5 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] font-semibold text-brand-700">
+            <IconCheck className="h-4 w-4" /> Locked in at {quote!.price.amount_display} - proceed to payment.
           </div>
         ) : (
-          <Button className="w-full" loading={committing} disabled={!plan.meets_floor} onClick={() => onCommit(plan.slots)}>
-            {!plan.meets_floor ? `Minimum is ${plan.floor_minor.amount_display}` : `Lock in ${plan.slots} slots`}
+          <Button className="w-full" loading={committing} disabled={!meetsFloor} onClick={() => onCommit(value)}>
+            {!meetsFloor ? `Minimum is ${plan.floor_minor.amount_display}` : `Lock in ${nairaFromMinor(value)}`}
           </Button>
         )}
       </div>
@@ -799,24 +924,135 @@ function QuoteStep({ campaignId, initialSlots, quote, committing, onCommit, onDi
   );
 }
 
-function Fund({ quote }: { quote: Quote | null }) {
+// ── Bits ───────────────────────────────────────────────────
+
+/**
+ * Terminal screen for the two managed, high-touch services - Ralia's team designs
+ * the creative, or hand-matches a high-profile creator. These leave the automated
+ * quote/pay flow and are arranged directly with the team by email/WhatsApp.
+ */
+function ManagedPathScreen({ kind, onDone }: { kind: 'DESIGN' | 'INFLUENCER' | 'PHYSICAL'; onDone: () => void }) {
+  const title =
+    kind === 'DESIGN' ? 'Ralia will design your creative'
+    : kind === 'PHYSICAL' ? 'We’ll set up your in-person campaign'
+    : 'We’ll hand-match your creator';
+  const body =
+    kind === 'DESIGN'
+      ? 'This one’s on us to make. Our design team will craft your poster and caption and send it over. We’ve saved your brief and will email you shortly to finish setting up your campaign.'
+      : kind === 'PHYSICAL'
+      ? 'In-person promotion (flyers, activations, street teams) is arranged by our team. We’ve saved your brief and will email you shortly to plan it with you.'
+      : 'Reaching a bigger audience is a hand-matched service. Our team will pair you with the right high-profile creator for a collab. We’ve saved your brief and will email you shortly to arrange it.';
+  return (
+    <div className="mx-auto max-w-lg py-10 text-center">
+      <div className="mx-auto grid h-16 w-16 place-items-center rounded-full bg-brand/10 text-brand"><IconSparkle className="h-8 w-8" /></div>
+      <h1 className="mt-5 text-[24px] font-extrabold tracking-tight text-ink">{title}</h1>
+      <p className="mt-2 text-[14.5px] leading-relaxed text-muted">{body}</p>
+      <div className="mt-6 flex flex-col items-center gap-3">
+        <a href="https://wa.me/2348139376563" target="_blank" rel="noreferrer" className="w-full">
+          <Button className="w-full"><IconChat className="h-4 w-4" /> Message us on WhatsApp</Button>
+        </a>
+        <a href="mailto:support@ralia.co?subject=Managed%20campaign%20request" className="text-[13.5px] font-semibold text-brand-700">Or email support@ralia.co</a>
+        <button onClick={onDone} className="mt-2 text-[13.5px] font-semibold text-muted hover:text-ink">Back to my campaigns</button>
+      </div>
+    </div>
+  );
+}
+
+function Fund({ quote, s }: { quote: Quote | null; s: State }) {
+  const posts = computePosts(s);
+  const cadenceLabel = posts > 1 ? `${posts} posts · ${s.cadence.charAt(0) + s.cadence.slice(1).toLowerCase().replace('_', '-')}` : 'One-off post';
+  const runWindow = s.startsAt || s.endsAt
+    ? `${s.startsAt ? fmtShortDate(s.startsAt) : 'On approval'} → ${s.endsAt ? fmtShortDate(s.endsAt) : 'Open'}`
+    : 'Starts on approval · no fixed end';
+  const creative = s.creativeMode === 'DESIGN'
+    ? 'Ralia designs your creative'
+    : s.assetFiles.length > 0
+      ? `${s.assetFiles.length} file${s.assetFiles.length === 1 ? '' : 's'} uploaded`
+      : 'No creative uploaded';
+  const audience: string[] = [
+    ...s.locations, ...s.ageBuckets, ...s.genders, ...s.languages, ...s.categories, ...s.platforms,
+  ];
+
   return (
     <div>
-      <Header title="Fund the campaign" subtitle="Pay securely with Paystack. Your campaign goes live the moment payment clears." />
-      <div className="mt-3 rounded-2xl border border-rule p-6">
-        <div className="flex items-baseline justify-between">
-          <span className="text-[14px] text-muted">Amount to pay</span>
-          <span className="text-[28px] font-extrabold tracking-tight text-brand">{quote?.price.amount_display ?? '—'}</span>
+      <Header title="Review &amp; fund" subtitle="Here's exactly what you're paying for. Pay securely with Paystack - your campaign then goes to review and is live the moment it's approved." />
+
+      <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_320px]">
+        {/* Branded summary */}
+        <div className="overflow-hidden rounded-2xl border border-rule bg-paper">
+          <div className="flex items-center gap-3 border-b border-rule bg-wash px-5 py-4">
+            <LogoMark className="h-8 w-8" />
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold uppercase tracking-[0.14em] text-brand-700">Campaign summary</div>
+              <div className="truncate text-[18px] font-extrabold text-ink">{s.name.trim() || 'Untitled campaign'}</div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-px bg-rule sm:grid-cols-3">
+            <FundFact label="Objective" value={objectiveLabel(s.objective)} />
+            <FundFact label="Promoters" value={quote ? quote.slots_total.toLocaleString('en-NG') : '-'} />
+            <FundFact label="Target views" value={quote ? `${quote.target_reach.toLocaleString('en-NG')}` : '-'} />
+            <FundFact label="Each promoter earns" value={quote?.promoter_fee.amount_display ?? '-'} />
+            <FundFact label="Schedule" value={cadenceLabel} />
+            <FundFact label="Runs" value={runWindow} />
+            <FundFact label="Promoter tier" value={s.minTier ? `${s.minTier.charAt(0)}${s.minTier.slice(1).toLowerCase()}+` : 'Any tier'} />
+          </div>
+
+          <div className="border-t border-rule px-5 py-4">
+            <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">Who sees it</div>
+            <div className="mt-2 flex flex-wrap gap-1.5">
+              {audience.length === 0 ? (
+                <span className="rounded-full bg-wash px-3 py-1 text-[12.5px] font-semibold text-ink">Anyone, nationwide</span>
+              ) : (
+                audience.slice(0, 10).map((a) => (
+                  <span key={a} className="rounded-full bg-wash px-3 py-1 text-[12.5px] font-semibold text-ink">{a}</span>
+                ))
+              )}
+              {audience.length > 10 && <span className="rounded-full bg-wash px-3 py-1 text-[12.5px] font-semibold text-muted">+{audience.length - 10} more</span>}
+            </div>
+          </div>
+
+          <div className="grid gap-px border-t border-rule bg-rule sm:grid-cols-2">
+            <div className="bg-paper px-5 py-4">
+              <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">Creative</div>
+              <div className="mt-1 text-[13.5px] font-semibold text-ink">{creative}</div>
+            </div>
+            <div className="bg-paper px-5 py-4">
+              <div className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">Destination link</div>
+              <div className="mt-1 truncate text-[13.5px] font-semibold text-ink">{s.destination_url.trim() || 'No link (post only)'}</div>
+            </div>
+          </div>
         </div>
-        <div className="mt-5 flex items-center gap-3 rounded-xl bg-wash px-4 py-3 text-[13px] text-muted">
-          Card details are entered in Paystack&apos;s secure window — Ralia never sees your card number.
+
+        {/* Pay box */}
+        <div className="h-max rounded-2xl border border-rule bg-paper p-5">
+          <div className="text-[13px] text-muted">Amount to pay</div>
+          <div className="mt-1 text-[32px] font-extrabold tracking-tight text-brand">{quote?.price.amount_display ?? '-'}</div>
+          {quote && (
+            <div className="mt-1 text-[12.5px] text-muted">
+              {quote.slots_total.toLocaleString('en-NG')} promoters × {quote.unit_price.amount_display}
+            </div>
+          )}
+          <div className="mt-4 rounded-xl bg-wash px-4 py-3 text-[12.5px] text-muted">
+            Card details are entered in Paystack&apos;s secure window - Ralia never sees your card number.
+          </div>
+          <div className="mt-3 rounded-xl bg-wash px-4 py-3 text-[12.5px] text-muted">
+            After payment your campaign goes to review. We&apos;ll email you a receipt now, and again the moment it&apos;s approved and live.
+          </div>
         </div>
       </div>
     </div>
   );
 }
 
-// ── Bits ───────────────────────────────────────────────────
+function FundFact({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-paper px-5 py-3.5">
+      <div className="text-[11px] font-bold uppercase tracking-[0.1em] text-muted">{label}</div>
+      <div className="mt-0.5 text-[14.5px] font-bold text-ink">{value}</div>
+    </div>
+  );
+}
 
 function Header({ title, subtitle }: { title: string; subtitle: string }) {
   return (
@@ -838,7 +1074,7 @@ function PillGroup({ label, options, value, onSelect }: { label: string; options
             type="button"
             onClick={() => onSelect(o === value ? '' : o)}
             className={`rounded-full px-5 py-2 text-[14px] font-semibold transition ${
-              value === o ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+              value === o ? 'bg-ink text-paper' : 'border border-rule bg-paper text-ink hover:border-ink/30'
             }`}
           >
             {o}
@@ -855,7 +1091,7 @@ function SelectCard({ on, onClick, children }: { on: boolean; onClick: () => voi
       type="button"
       onClick={onClick}
       className={`rounded-2xl px-4 py-3.5 text-[14px] font-semibold transition ${
-        on ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+        on ? 'bg-ink text-paper' : 'border border-rule bg-paper text-ink hover:border-ink/30'
       }`}
     >
       {children}
@@ -883,11 +1119,23 @@ function RadioCard({ on, onClick, title, body }: { on: boolean; onClick: () => v
   );
 }
 
-function ChipMulti({ label, options, value, onToggle }: { label: string; options: string[]; value: string[]; onToggle: (v: string) => void }) {
+function ChipMulti({ label, options, value, onToggle, allLabel, onClear }: { label: string; options: string[]; value: string[]; onToggle: (v: string) => void; allLabel?: string; onClear?: () => void }) {
+  const allOn = value.length === 0;
   return (
     <div>
       <p className="mb-2 text-[14px] font-semibold text-ink">{label}</p>
       <div className="flex flex-wrap gap-2.5">
+        {allLabel && onClear && (
+          <button
+            type="button"
+            onClick={onClear}
+            className={`rounded-full px-4 py-2 text-[13px] font-semibold transition ${
+              allOn ? 'bg-ink text-paper' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+            }`}
+          >
+            {allLabel}
+          </button>
+        )}
         {options.map((o) => {
           const on = value.includes(o);
           return (
@@ -896,7 +1144,7 @@ function ChipMulti({ label, options, value, onToggle }: { label: string; options
               type="button"
               onClick={() => onToggle(o)}
               className={`rounded-full px-4 py-2 text-[13px] font-semibold transition ${
-                on ? 'bg-ink text-white' : 'border border-rule bg-paper text-ink hover:border-ink/30'
+                on ? 'bg-ink text-paper' : 'border border-rule bg-paper text-ink hover:border-ink/30'
               }`}
             >
               {on ? '× ' : ''}{o}
@@ -913,12 +1161,12 @@ function ChipMulti({ label, options, value, onToggle }: { label: string; options
 function hydrateState(prev: State, c: Campaign): State {
   const t = c.targeting;
   // Reverse-map the saved targeting arrays back to selected labels (best-effort for
-  // resuming a draft). Location: a bucket is on when all its states are present, or
-  // "Nationwide" when no states are set. Age: match any bucket whose exact bounds are
-  // in the saved range.
+  // resuming a draft). Location: a bucket is on when all its states are present; no
+  // states saved = "Any Location" (no chips selected). Age: match any bucket whose
+  // exact bounds are in the saved range.
   const tStates = t?.states ?? [];
   const locations = t
-    ? LOCATIONS.filter((l) => (l.states.length === 0 ? tStates.length === 0 : l.states.every((st) => tStates.includes(st)))).map((l) => l.label)
+    ? LOCATIONS.filter((l) => l.states.every((st) => tStates.includes(st))).map((l) => l.label)
     : [];
   const tGenders = t?.genders ?? [];
   const genders = GENDER_OPTIONS.filter((g) => tGenders.includes(g.value)).map((g) => g.label);
@@ -933,6 +1181,7 @@ function hydrateState(prev: State, c: Campaign): State {
     objective: c.objective ?? 'AWARENESS',
     description: c.description ?? '',
     destination_url: c.destination_url ?? '',
+    minTier: c.min_tier && c.min_tier !== 'BRONZE' ? c.min_tier : '',
     startsAt: c.starts_at ? c.starts_at.slice(0, 10) : '',
     endsAt: c.ends_at ? c.ends_at.slice(0, 10) : '',
     cadence: c.cadence ?? 'ONE_OFF',

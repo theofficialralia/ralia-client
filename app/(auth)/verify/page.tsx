@@ -8,12 +8,14 @@ import { OtpInput } from '@/components/ui/OtpInput';
 import { Spinner } from '@/components/ui/Spinner';
 import { api, ApiError, type Tokens } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { track } from '@/lib/meta-pixel';
 
 function VerifyInner() {
   const router = useRouter();
   const params = useSearchParams();
   const { setTokens } = useAuth();
   const phone = params.get('phone') ?? '';
+  const email = params.get('email') ?? '';
 
   const [code, setCode] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +35,9 @@ function VerifyInner() {
     try {
       const tokens = await api.post<Tokens>('/v1/auth/otp/verify', { phone_e164: phone, code }, { auth: false });
       await setTokens(tokens);
+      // Signup complete — a business account is now active. Browser-only Pixel event
+      // (no server twin, so no event_id needed); tracks client acquisition.
+      track('CompleteRegistration', { content_name: 'client_signup' });
       // New business owners land on the optional "Set up your organisation" step;
       // it is skippable straight through to the dashboard.
       router.replace('/setup');
@@ -58,12 +63,11 @@ function VerifyInner() {
 
       <div className="flex flex-col items-center text-center">
         <LogoMark className="mb-5 h-10 w-10" />
-        <h1 className="text-[26px] font-extrabold tracking-tight text-ink">Verify your number</h1>
-        {/* The design says "email"; the API sends the code to the WhatsApp/phone
-            number from registration. Copy reflects what actually happens. */}
+        <h1 className="text-[26px] font-extrabold tracking-tight text-ink">Verify your email</h1>
+        {/* OTP is delivered by email (OTP_TRANSPORT=email). Copy reflects what actually happens. */}
         <p className="mt-2 text-[14px] text-muted">
           We&apos;ve sent a 6-digit code to{' '}
-          <span className="font-semibold text-ink">{phone || 'your WhatsApp number'}</span>
+          <span className="font-semibold text-ink">{email || 'your email'}</span>
         </p>
       </div>
 
