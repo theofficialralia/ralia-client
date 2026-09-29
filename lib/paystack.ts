@@ -1,6 +1,6 @@
 /**
  * Paystack Inline (the hosted popup). Card details are entered inside Paystack's
- * own iframe, never in our DOM — which keeps the app out of PCI-DSS scope. This
+ * own iframe, never in our DOM - which keeps the app out of PCI-DSS scope. This
  * is deliberately NOT the raw card form the mockup drew (that form would capture
  * the PAN in our page).
  *

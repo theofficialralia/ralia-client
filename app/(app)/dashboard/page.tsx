@@ -37,8 +37,8 @@ export default function DashboardPage() {
           : 'Loading your overview…'}
       </p>
 
-      {/* Stat cards — all four backed by /dashboard/summary (no wallet card: the
-          backend funds per-campaign, not a prepaid wallet — see client README). */}
+      {/* Stat cards - all four backed by /dashboard/summary (no wallet card: the
+          backend funds per-campaign, not a prepaid wallet - see client README). */}
       <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <Stat
           label="Total spent · this month"
@@ -101,7 +101,7 @@ function Stat({ label, value, foot, loading }: { label: string; value?: string; 
       {loading ? (
         <div className="mt-2 h-8 w-24 animate-pulse rounded bg-rule/60" />
       ) : (
-        <p className="mt-1.5 text-[26px] font-extrabold tracking-tight text-ink">{value ?? '—'}</p>
+        <p className="mt-1.5 text-[26px] font-extrabold tracking-tight text-ink">{value ?? '-'}</p>
       )}
       {foot && <p className="mt-2 text-[12.5px] font-semibold text-brand-700">{foot}</p>}
     </div>

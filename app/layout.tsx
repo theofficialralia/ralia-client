@@ -2,6 +2,8 @@ import type { Metadata } from 'next';
 import { Urbanist } from 'next/font/google';
 import './globals.css';
 import { Providers } from '@/lib/providers';
+import { EnvBadge } from '@/components/EnvBadge';
+import { MetaPixel } from '@/components/MetaPixel';
 
 const urbanist = Urbanist({
   subsets: ['latin'],
@@ -11,7 +13,7 @@ const urbanist = Urbanist({
 });
 
 export const metadata: Metadata = {
-  title: 'Ralia — Businesses',
+  title: 'Ralia - Businesses',
   description: 'Fund campaigns, reach real audiences through everyday promoters, and see proof of every post.',
 };
 
@@ -26,6 +28,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       </head>
       <body>
         <Providers>{children}</Providers>
+        <MetaPixel />
+        <EnvBadge />
       </body>
     </html>
   );

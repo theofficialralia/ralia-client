@@ -6,6 +6,25 @@ export const OBJECTIVES = [
   { value: 'PURCHASE', label: 'Purchase' },
 ] as const;
 
+/**
+ * The client-facing objective labels - the exact words shown in the create
+ * wizard. Use this ANYWHERE a campaign's objective is displayed so it always
+ * matches what the client actually chose (e.g. they picked "Sales", never the
+ * raw enum "Purchase"; "Visibility", never "Awareness").
+ */
+const OBJECTIVE_LABELS: Record<string, string> = {
+  AWARENESS: 'Visibility',
+  PURCHASE: 'Sales',
+  WEBSITE_VISIT: 'Engagement',
+  LEAD_GEN: 'Lead Generation',
+  APP_INSTALL: 'App Installs',
+};
+
+export function objectiveLabel(value: string | null | undefined): string {
+  if (!value) return '';
+  return OBJECTIVE_LABELS[value] ?? value.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
 export const PLATFORMS = [
   { value: 'WHATSAPP_STATUS', label: 'WhatsApp Status' },
   { value: 'WHATSAPP_GROUP', label: 'WhatsApp Group' },
@@ -28,7 +47,7 @@ export const ROLES = [
 /**
  * The single Category-of-Interest taxonomy (dev-support spec R736-GEN-OD-00001).
  * Used for campaign categories, promoter preferred_categories, and business
- * sector — they must match so matching's categoryFit actually lines up.
+ * sector - they must match so matching's categoryFit actually lines up.
  */
 export const CATEGORIES = [
   'Technology & Digital Products',

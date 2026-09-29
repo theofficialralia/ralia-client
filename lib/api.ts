@@ -127,6 +127,7 @@ export type ClientProfile = {
   support_contact_phone: string | null;
   description: string | null;
   socials: ClientSocial[] | null;
+  logo_url: string | null;
   status: string;
 };
 
@@ -155,6 +156,7 @@ export type Campaign = {
   description: string | null;
   promoter_instructions: string | null;
   destination_url: string | null;
+  min_tier?: 'BRONZE' | 'SILVER' | 'GOLD' | 'PLATINUM' | null;
   slots_total: number;
   slots_filled: number;
   price: Money | null;
@@ -180,6 +182,7 @@ export type Quote = {
   estimated_reach: number;
   eligible_promoters: number;
   active_filters: number;
+  target_reach: number;
 };
 
 export type Cadence = 'ONE_OFF' | 'DAILY' | 'WEEKLY' | 'CUSTOM';
@@ -230,6 +233,8 @@ export type EvidenceItem = {
   platform: string;
   submitted_at: string;
   views: number;
+  views_verified: boolean;
+  clicks: number;
   verdict: string;
   auto_flag: boolean;
   public_url: string | null;
@@ -252,5 +257,7 @@ export type CampaignAnalytics = {
   acceptance_rate: number;
   completed: number;
   slots_total: number;
+  target_reach: number;
+  success_rate_pct: number;
   evidence: EvidenceItem[];
 };

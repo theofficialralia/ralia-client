@@ -2,11 +2,15 @@
 
 import { use, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { useQuery } from '@tanstack/react-query';
-import { api, type CampaignAnalytics, type EvidenceItem } from '@/lib/api';
-import { platformLabel, timeAgo, titleCase } from '@/lib/format';
+import { useSearchParams } from 'next/navigation';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { api, ApiError, type CampaignAnalytics, type EvidenceItem } from '@/lib/api';
+import type { Money } from '@/lib/money';
+import { platformLabel, timeAgo } from '@/lib/format';
+import { objectiveLabel } from '@/lib/campaign-options';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { Spinner } from '@/components/ui/Spinner';
+import { IconCheck, IconDownload, IconExternal, IconPause } from '@/components/brand/icons';
 import { Button } from '@/components/ui/Button';
 import { EvidenceCard } from '@/components/campaigns/EvidenceCard';
 
@@ -19,6 +23,8 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
 
   const [channel, setChannel] = useState<string>('all');
   const [lightbox, setLightbox] = useState<EvidenceItem | null>(null);
+  const search = useSearchParams();
+  const justSubmitted = search.get('submitted') === '1';
 
   const channels = useMemo(() => {
     if (!data) return [];
@@ -47,10 +53,10 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
         </Link>
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" disabled title="Pausing is a fast-follow">
-            ❙❙ Pause
+            <IconPause className="h-4 w-4" /> Pause
           </Button>
-          <Button variant="secondary" size="sm" disabled title="Report export is a fast-follow">
-            ↓ Export report
+          <Button variant="secondary" size="sm" onClick={() => exportReport(data)}>
+            <IconDownload className="h-4 w-4" /> Export report
           </Button>
         </div>
       </div>
@@ -59,14 +65,17 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
       <div className="mt-6 flex items-center gap-3">
         <StatusPill status={data.status} />
         <span className="text-[13.5px] text-muted">
-          {titleCase(data.objective)}
+          {objectiveLabel(data.objective)}
           {data.launched_at && ` · Launched ${new Date(data.launched_at).toLocaleDateString('en-CA')}`}
         </span>
       </div>
       <h1 className="mt-2 text-[28px] font-extrabold tracking-tight text-ink">{data.name}</h1>
 
+      {/* Lifecycle gate: review → approve → pay → live. Nothing goes live without an admin review. */}
+      <LifecyclePanel campaignId={id} status={data.status} amount={data.budget} justSubmitted={justSubmitted} />
+
       {/* Stats */}
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+      <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
         <Stat label="Amount spent" value={data.spent.amount_display} foot={`of ${data.budget.amount_display} budget`} />
         <Stat
           label="Views delivered"
@@ -84,6 +93,13 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
           foot={`Offer acceptance ${Math.round(data.acceptance_rate * 100)}%`}
         />
         <Stat label="Completed" value={`${data.completed}/${data.slots_total}`} foot="Verified &amp; paid" />
+        {data.target_reach > 0 && (
+          <Stat
+            label="Success rate"
+            value={`${data.success_rate_pct}%`}
+            foot={`${data.views_delivered.toLocaleString('en-NG')} of ${data.target_reach.toLocaleString('en-NG')} target reach`}
+          />
+        )}
       </div>
 
       {/* Evidence gallery */}
@@ -93,7 +109,7 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
           <h2 className="text-[22px] font-extrabold tracking-tight text-ink">
             Evidence gallery · {verified} verified
           </h2>
-          <p className="mt-1 text-[13.5px] text-muted">Every screenshot is a post you paid for. Zoom and filter.</p>
+          <p className="mt-1 text-[13.5px] text-muted">Each card shows the <b className="font-semibold text-ink">views the promoter reported</b> on their post (verified by Ralia at review) — separate from the link clicks we recorded.</p>
         </div>
         {channels.length > 1 && (
           <select
@@ -129,6 +145,98 @@ export default function CampaignDetailPage({ params }: { params: Promise<{ id: s
   );
 }
 
+/**
+ * The pre-live lifecycle: pay (in the wizard) → under review → approved & LIVE,
+ * or sent back for changes / rejected & refunded. Payment happens in the create
+ * wizard now, so this panel only reflects the review outcome.
+ */
+function LifecyclePanel({ campaignId, status, justSubmitted }: {
+  campaignId: string; status: string; amount: Money; justSubmitted: boolean;
+}) {
+  const qc = useQueryClient();
+  const [err, setErr] = useState<string | null>(null);
+  const resubmit = useMutation({
+    mutationFn: () => api.post(`/v1/campaigns/${campaignId}/submit`, {}),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ['campaign-analytics', campaignId] }),
+    onError: (e: unknown) => setErr(e instanceof ApiError ? e.message : 'Could not resubmit.'),
+  });
+
+  if (status === 'PENDING_APPROVAL') {
+    return (
+      <div className="mt-5 rounded-2xl border border-warn/30 bg-warn-wash px-5 py-4">
+        <p className="inline-flex items-center gap-1.5 text-[15px] font-bold text-warn">
+          {justSubmitted && <IconCheck className="h-4 w-4" />}
+          {justSubmitted ? 'Payment received - under review' : 'Under review'}
+        </p>
+        <p className="mt-1 text-[13.5px] text-body">
+          Your payment is in. Our team reviews every campaign before it goes live - we&apos;ll email you the moment it&apos;s approved.
+        </p>
+      </div>
+    );
+  }
+
+  if (status === 'REJECTED') {
+    return (
+      <div className="mt-5 rounded-2xl border border-warn/30 bg-warn-wash px-5 py-4">
+        <p className="text-[15px] font-bold text-warn">Changes needed before this can go live</p>
+        <p className="mt-1 text-[13.5px] text-body">
+          Our team sent this back - check your email for what to fix. Your payment is safe; edit the campaign, then resubmit for review (no need to pay again).
+        </p>
+        <div className="mt-3 flex items-center gap-3">
+          <Button onClick={() => resubmit.mutate()} loading={resubmit.isPending}>Resubmit for review</Button>
+        </div>
+        {err && <p className="mt-2 text-[12.5px] text-brand-700">{err}</p>}
+      </div>
+    );
+  }
+
+  if (status === 'CANCELLED') {
+    return (
+      <div className="mt-5 rounded-2xl border border-brand/30 bg-brand/5 px-5 py-4">
+        <p className="text-[15px] font-bold text-brand-700">This campaign was rejected - and refunded</p>
+        <p className="mt-1 text-[13.5px] text-body">
+          It didn&apos;t pass review, so it won&apos;t run. Your payment has been refunded to your Ralia balance. Contact support if you think this was a mistake.
+        </p>
+      </div>
+    );
+  }
+
+  return null;
+}
+
+/** Build a CSV of the campaign summary + every piece of proof, and download it. */
+function exportReport(data: CampaignAnalytics) {
+  const cell = (v: string | number) => `"${String(v).replace(/"/g, '""')}"`;
+  const lines: string[] = [
+    'Ralia campaign report',
+    `${cell('Campaign')},${cell(data.name)}`,
+    `${cell('Objective')},${cell(objectiveLabel(data.objective))}`,
+    `${cell('Status')},${cell(data.status)}`,
+    `${cell('Amount spent')},${cell(data.spent.amount_display)}`,
+    `${cell('Budget')},${cell(data.budget.amount_display)}`,
+    `${cell('Views delivered')},${cell(data.views_delivered)}`,
+    `${cell('Clicks delivered')},${cell(data.clicks_delivered)}`,
+    `${cell('Target reach')},${cell(data.target_reach)}`,
+    `${cell('Success rate')},${cell(`${data.success_rate_pct}%`)}`,
+    `${cell('Completed')},${cell(`${data.completed}/${data.slots_total}`)}`,
+    '',
+    'Proof of promotion',
+    ['Promoter', 'Handle', 'Platform', 'Reported views', 'Views verified', 'Link clicks', 'Submitted', 'Verdict', 'Link'].map(cell).join(','),
+    ...data.evidence.map((e) =>
+      [e.promoter_name ?? '', e.promoter_handle ?? '', e.platform, e.views, e.views_verified ? 'yes' : 'no', e.clicks, new Date(e.submitted_at).toISOString(), e.verdict, e.public_url ?? '']
+        .map(cell)
+        .join(','),
+    ),
+  ];
+  const blob = new Blob([lines.join('\n')], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `${data.name.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-report.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
 function Stat({ label, value, foot }: { label: string; value: string; foot: string }) {
   return (
     <div className="stat-card">
@@ -142,7 +250,7 @@ function Stat({ label, value, foot }: { label: string; value: string; foot: stri
 function Lightbox({ item, onClose }: { item: EvidenceItem; onClose: () => void }) {
   const [imgOk, setImgOk] = useState(true);
   // image_url is served by the API (/v1/files/:id streams local, redirects to the CDN
-  // otherwise), so any set URL is renderable — fall back only if the load actually fails.
+  // otherwise), so any set URL is renderable - fall back only if the load actually fails.
   const showImage = !!item.image_url && imgOk;
   return (
     <div
@@ -171,11 +279,21 @@ function Lightbox({ item, onClose }: { item: EvidenceItem; onClose: () => void }
             <span className="text-[13px] text-muted">Screenshot unavailable</span>
           )}
         </div>
-        <div className="flex items-center justify-between px-5 py-4">
-          <span className="text-[14px] font-bold text-ink">{item.views.toLocaleString('en-NG')} views</span>
+        <div className="flex items-end justify-between gap-4 px-5 py-4">
+          <div className="min-w-0">
+            <div className="text-[16px] font-extrabold tabular-nums text-ink">
+              {item.views.toLocaleString('en-NG')} <span className="text-[13px] font-semibold text-muted">views</span>
+            </div>
+            <div className="mt-0.5 text-[12px] text-muted">
+              {item.views_verified
+                ? 'Verified by Ralia from the promoter’s post.'
+                : 'Reported by the promoter — verified at review.'}
+              {' · '}<span className="tabular-nums">{item.clicks.toLocaleString('en-NG')}</span> link click{item.clicks === 1 ? '' : 's'} recorded
+            </div>
+          </div>
           {item.public_url && (
-            <a href={item.public_url} target="_blank" rel="noreferrer" className="text-[13.5px] font-semibold text-brand-700">
-              View original post ↗
+            <a href={item.public_url} target="_blank" rel="noreferrer" className="inline-flex shrink-0 items-center gap-1 text-[13.5px] font-semibold text-brand-700">
+              View original post <IconExternal className="h-3.5 w-3.5" />
             </a>
           )}
         </div>

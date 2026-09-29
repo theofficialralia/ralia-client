@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useForm } from 'react-hook-form';
@@ -23,6 +23,13 @@ export default function LoginPage() {
   const router = useRouter();
   const { setTokens } = useAuth();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  // Read from the URL directly (no useSearchParams) to avoid a Suspense boundary.
+  useEffect(() => {
+    const reason = new URLSearchParams(window.location.search).get('reason');
+    if (reason === 'idle') setNotice('You were signed out after 10 minutes of inactivity. Any work in progress was saved.');
+    else if (reason === 'reset') setNotice('Your password was reset. Sign in with your new password.');
+  }, []);
   const {
     register,
     handleSubmit,
@@ -37,7 +44,7 @@ export default function LoginPage() {
       router.replace('/dashboard');
     } catch (e) {
       if (e instanceof ApiError && e.code === 'PHONE_NOT_VERIFIED') {
-        setServerError('Verify your number to continue.');
+        setServerError('Verify your email to continue.');
       } else {
         setServerError(e instanceof ApiError ? e.message : 'Could not sign you in.');
       }
@@ -52,6 +59,12 @@ export default function LoginPage() {
         <p className="mt-1.5 text-[14px] text-muted">Sign in to your business account.</p>
       </div>
 
+      {notice && (
+        <div className="mb-4 rounded-xl border border-ok/25 bg-ok/5 px-4 py-3 text-[13px] text-ink">
+          {notice}
+        </div>
+      )}
+
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-4" noValidate>
         <Field label="Business email" error={errors.email?.message}>
           <Input type="email" placeholder="you@business.ng" {...register('email')} />
@@ -59,6 +72,9 @@ export default function LoginPage() {
         <Field label="Password" error={errors.password?.message}>
           <PasswordInput placeholder="Your password" {...register('password')} />
         </Field>
+        <div className="-mt-1 text-right">
+          <Link href="/reset-password" className="text-[13px] font-semibold text-brand-700">Forgot password?</Link>
+        </div>
 
         {serverError && (
           <div className="rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] text-brand-700">
