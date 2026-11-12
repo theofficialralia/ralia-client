@@ -173,6 +173,9 @@ export type Campaign = {
   targeting?: CampaignTargetingView | null;
 };
 
+export type EnterpriseTier = { months: number; price: Money };
+export type EnterprisePricing = { tiers: EnterpriseTier[]; benefits: string[] };
+
 export type UgcContentStatus = 'PENDING_CLIENT_REVIEW' | 'CLIENT_APPROVED' | 'CLIENT_REJECTED';
 
 export type UgcContent = {

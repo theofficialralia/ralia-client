@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { api, ApiError, uuid, type Campaign, type CampaignPlan, type Quote } from '@/lib/api';
+import { api, ApiError, uuid, type Campaign, type CampaignPlan, type EnterprisePricing, type Quote } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { loadPaystack, PAYSTACK_PUBLIC_KEY, paystackConfigured } from '@/lib/paystack';
 import { getFbCookies, newEventId, track } from '@/lib/meta-pixel';
@@ -37,9 +37,9 @@ const SERVICES: { id: Service; title: string; tag: string; body: string; ready: 
   {
     id: 'ENTERPRISE',
     title: 'Enterprise',
-    tag: 'Coming soon',
+    tag: 'Live',
     body: 'A hands-on package for companies — your own account manager, strategy and hand-picked creators. From ₦1,000,000.',
-    ready: false,
+    ready: true,
   },
 ];
 
@@ -317,6 +317,11 @@ function NewCampaignInner() {
     return <ServicePicker onPick={(id, ready) => (ready ? setService(id) : setComingSoon(id))} onCancel={() => router.push('/campaigns')} />;
   }
 
+  // Enterprise is a lead, not a campaign — its own self-contained flow.
+  if (service === 'ENTERPRISE') {
+    return <EnterpriseFlow onBack={() => setService(null)} onDone={() => router.push('/campaigns')} />;
+  }
+
   const isUgc = service === 'UGC';
   const steps = isUgc ? UGC_STEPS : PROMOTE_STEPS;
   const pricing = isUgc ? UGC_PRICING : PROMOTE_PRICING;
@@ -418,6 +423,120 @@ function ComingSoon({ service, onBack }: { service: Service; onBack: () => void 
       <p className="mx-auto mt-2 max-w-md text-[15px] leading-relaxed text-muted">{copy.body}</p>
       <div className="mt-6 flex justify-center">
         <Button variant="secondary" onClick={onBack}><IconArrowLeft className="h-4 w-4" /> Back to services</Button>
+      </div>
+    </div>
+  );
+}
+
+// ── Enterprise ─────────────────────────────────────────────
+
+function EnterpriseFlow({ onBack, onDone }: { onBack: () => void; onDone: () => void }) {
+  const [pricing, setPricing] = useState<EnterprisePricing | null>(null);
+  const [step, setStep] = useState(1);
+  const [brief, setBrief] = useState('');
+  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
+  const [months, setMonths] = useState<number | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    api.get<EnterprisePricing>('/v1/enterprise/pricing').then(setPricing).catch(() => setError('Could not load the Enterprise plans.'));
+  }, []);
+
+  function next() {
+    if (!brief.trim()) return setError('Tell us a bit about what you need.');
+    if (!phone.trim()) return setError('Add a phone number so we can reach you.');
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return setError('Add a valid email.');
+    setError(null);
+    setStep(2);
+  }
+
+  async function submit() {
+    if (!months) return setError('Pick a plan.');
+    setBusy(true); setError(null);
+    try {
+      await api.post('/v1/enterprise/leads', { brief: brief.trim(), contact_phone: phone.trim(), contact_email: email.trim(), duration_months: months });
+      setDone(true);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not send your enquiry.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  if (done) {
+    return (
+      <div className="mx-auto max-w-xl py-10 text-center">
+        <div className="mx-auto grid h-14 w-14 place-items-center rounded-full bg-emerald-50 text-emerald-600"><IconCheck className="h-7 w-7" /></div>
+        <h2 className="mt-5 text-[22px] font-bold text-ink">Enquiry sent</h2>
+        <p className="mx-auto mt-2 max-w-md text-[15px] leading-relaxed text-muted">Thanks — our team will reach out shortly to build your package and get you started.</p>
+        <div className="mt-6 flex justify-center"><Button onClick={onDone}>Back to campaigns</Button></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="mx-auto max-w-2xl">
+      <button onClick={() => (step === 1 ? onBack() : setStep(1))} className="flex items-center gap-1.5 text-[15px] font-semibold text-muted hover:text-ink">
+        <IconArrowLeft className="h-4 w-4" /> {step === 1 ? 'Back to services' : 'Back'}
+      </button>
+
+      <div className="mt-6">
+        {step === 1 ? (
+          <div className="space-y-6">
+            <Header title="Tell us what you need" subtitle="A hands-on package, run with you by our team. No reach targets — just tell us your goal and we’ll shape it together." />
+            <Field label="What are you looking to do?">
+              <Textarea value={brief} onChange={(e) => setBrief(e.target.value)} placeholder="We’re launching a new product line in Q1 and want a full creator-led campaign with strategy support…" />
+            </Field>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <Field label="Phone"><Input value={phone} onChange={(e) => setPhone(e.target.value)} placeholder="+234 801 234 5678" /></Field>
+              <Field label="Email"><Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="you@company.com" /></Field>
+            </div>
+          </div>
+        ) : (
+          <div className="space-y-6">
+            <Header title="Choose your plan" subtitle="Pick how long you want us running with you. You’ll confirm the details with your account manager." />
+            {!pricing ? (
+              <div className="flex justify-center py-10"><Spinner className="h-7 w-7 text-brand" /></div>
+            ) : (
+              <>
+                <div className="grid gap-3">
+                  {pricing.tiers.map((t) => (
+                    <button
+                      key={t.months}
+                      onClick={() => setMonths(t.months)}
+                      className={`flex items-center justify-between rounded-2xl border p-4 text-left transition ${months === t.months ? 'border-brand bg-brand/[0.03] ring-1 ring-brand/30' : 'border-rule hover:border-brand/40'}`}
+                    >
+                      <span className="text-[15px] font-semibold text-ink">{t.months} month{t.months === 1 ? '' : 's'}</span>
+                      <span className="text-[18px] font-extrabold text-brand">{t.price.amount_display}</span>
+                    </button>
+                  ))}
+                </div>
+                {pricing.benefits.length > 0 && (
+                  <div className="rounded-2xl border border-rule bg-wash/40 p-5">
+                    <div className="text-[13px] font-semibold text-ink">What’s included</div>
+                    <ul className="mt-2 space-y-1.5">
+                      {pricing.benefits.map((b, i) => (
+                        <li key={i} className="flex items-start gap-2 text-[14px] text-body"><IconCheck className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" /> {b}</li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
+        {error && <div className="mt-5 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] text-brand-700">{error}</div>}
+
+        <div className="mt-7 flex items-center justify-between">
+          <Button variant="secondary" onClick={() => (step === 1 ? onBack() : setStep(1))} disabled={busy}><IconArrowLeft className="h-4 w-4" /> Back</Button>
+          {step === 1
+            ? <Button onClick={next}>Continue <IconArrowRight className="h-4 w-4" /></Button>
+            : <Button onClick={submit} loading={busy} disabled={!months}>Send enquiry</Button>}
+        </div>
       </div>
     </div>
   );
