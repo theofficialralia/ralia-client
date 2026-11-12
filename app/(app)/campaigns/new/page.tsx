@@ -8,7 +8,7 @@ import { loadPaystack, PAYSTACK_PUBLIC_KEY, paystackConfigured } from '@/lib/pay
 import { getFbCookies, newEventId, track } from '@/lib/meta-pixel';
 import { Spinner } from '@/components/ui/Spinner';
 import { Button } from '@/components/ui/Button';
-import { Field, Input } from '@/components/ui/Field';
+import { Field, Input, Textarea } from '@/components/ui/Field';
 import { IconArrowLeft, IconArrowRight, IconCheck, IconSparkle, IconUpload } from '@/components/brand/icons';
 
 // ─────────────────────────────────────────────────────────────
@@ -30,9 +30,9 @@ const SERVICES: { id: Service; title: string; tag: string; body: string; ready: 
   {
     id: 'UGC',
     title: 'Create UGC content',
-    tag: 'Coming soon',
+    tag: 'Live',
     body: 'Creators make fresh content about your product. You approve each piece before it posts. ₦100,000 per 5,000 people reached.',
-    ready: false,
+    ready: true,
   },
   {
     id: 'ENTERPRISE',
@@ -58,9 +58,6 @@ const AGE_BUCKETS = [
 ];
 const RELIGIONS = ['Christianity', 'Islam', 'Others'];
 
-// Quick reach presets the client can tap instead of typing.
-const REACH_PRESETS = [1000, 2000, 5000, 10000, 25000];
-
 type State = {
   name: string;
   endsAt: string;
@@ -71,6 +68,12 @@ type State = {
   ageBuckets: string[];
   religions: string[];
   targetReach: string;
+  // UGC brief (free text; stored as JSON blobs on the backend).
+  ugcProduct: string;
+  ugcContentSpecs: string;
+  ugcGuidelines: string;
+  ugcRights: string;
+  ugcWantsCopy: boolean;
 };
 
 const initial: State = {
@@ -83,9 +86,17 @@ const initial: State = {
   ageBuckets: [],
   religions: [],
   targetReach: '',
+  ugcProduct: '',
+  ugcContentSpecs: '',
+  ugcGuidelines: '',
+  ugcRights: '',
+  ugcWantsCopy: false,
 };
 
 const PROMOTE_STEPS = ['Campaign', 'Audience', 'Reach & price', 'Pay'];
+const UGC_STEPS = ['Brief', 'Reach & price', 'Pay'];
+const PROMOTE_PRICING = { label: '₦15,000 for every 1,000 people reached', presets: [1000, 2000, 5000, 10000, 25000] };
+const UGC_PRICING = { label: '₦100,000 for every 5,000 people reached, per creator', presets: [5000, 10000, 15000, 25000] };
 
 function NewCampaignInner() {
   const router = useRouter();
@@ -136,8 +147,10 @@ function NewCampaignInner() {
     if (!s.name.trim()) return setError('Give your campaign a name.');
     if (!s.creativeMode) return setError('Choose whether you have the content or want us to create it.');
     if (s.creativeMode === 'DESIGN') {
-      // "Design one for me" is the UGC service — send them there.
-      setComingSoon('UGC');
+      // "Design one for me" is the UGC service — switch into that flow.
+      setService('UGC');
+      setStep(1);
+      setError(null);
       return;
     }
     const hasDestination = /^https?:\/\//.test(s.destinationUrl);
@@ -196,6 +209,35 @@ function NewCampaignInner() {
     }
   }
 
+  // Create (or update) a UGC campaign and save the creator brief, then move to the
+  // reach & price step.
+  async function saveUgcCampaign() {
+    if (!s.name.trim()) return setError('Give your campaign a name.');
+    if (!s.ugcProduct.trim()) return setError('Tell the creators what the product or offer is.');
+    if (s.endsAt && s.endsAt < new Date().toISOString().slice(0, 10)) return setError('The deadline can’t be in the past.');
+    setBusy(true); setError(null);
+    try {
+      const body = { name: s.name.trim(), objective: 'AWARENESS', service_type: 'UGC', slots_total: 1, ends_at: s.endsAt || null };
+      const campaign = campaignId
+        ? await api.patch<Campaign>(`/v1/campaigns/${campaignId}`, body)
+        : await api.post<Campaign>('/v1/campaigns', body);
+      setCampaignId(campaign.id);
+      await api.put(`/v1/campaigns/${campaign.id}/ugc-brief`, {
+        product: { brief: s.ugcProduct },
+        content_specs: { brief: s.ugcContentSpecs },
+        guidelines: { brief: s.ugcGuidelines },
+        rights: { brief: s.ugcRights },
+        client_wants_copy: s.ugcWantsCopy,
+      });
+      setQuote(null);
+      setStep(2);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : 'Could not save your brief.');
+    } finally {
+      setBusy(false);
+    }
+  }
+
   // Lock in the reach the client chose: the quote freezes the flat price and moves
   // the campaign to QUOTED, ready to pay.
   async function lockQuote() {
@@ -206,7 +248,7 @@ function NewCampaignInner() {
     try {
       const q = await api.post<Quote>(`/v1/campaigns/${campaignId}/quote`, { target_reach: reach });
       setQuote(q);
-      setStep(4);
+      setStep((n) => n + 1);
     } catch (e) {
       setError(e instanceof ApiError ? e.message : 'Could not lock in your reach.');
     } finally {
@@ -275,6 +317,12 @@ function NewCampaignInner() {
     return <ServicePicker onPick={(id, ready) => (ready ? setService(id) : setComingSoon(id))} onCancel={() => router.push('/campaigns')} />;
   }
 
+  const isUgc = service === 'UGC';
+  const steps = isUgc ? UGC_STEPS : PROMOTE_STEPS;
+  const pricing = isUgc ? UGC_PRICING : PROMOTE_PRICING;
+  const reachStepNo = isUgc ? 2 : 3;
+  const payStepNo = isUgc ? 3 : 4;
+
   return (
     <div className="mx-auto max-w-3xl">
       <div className="flex items-center justify-between">
@@ -284,16 +332,20 @@ function NewCampaignInner() {
         >
           <IconArrowLeft className="h-4 w-4" /> {step === 1 ? 'Back to services' : 'Back'}
         </button>
-        <span className="text-[13px] text-muted">Step {step} of 4</span>
+        <span className="text-[13px] text-muted">Step {step} of {steps.length}</span>
       </div>
 
-      <div className="mt-5"><PromoteStepper current={step} /></div>
+      <div className="mt-5"><Stepper steps={steps} current={step} /></div>
 
       <div className="mt-6">
-        {step === 1 && <CampaignStep s={s} set={set} />}
-        {step === 2 && <AudienceStep s={s} set={set} />}
-        {step === 3 && campaignId && <ReachStep campaignId={campaignId} reach={s.targetReach} setReach={(v) => set({ targetReach: v })} />}
-        {step === 4 && <PayStep quote={quote} />}
+        {/* Promote: Campaign → Audience → Reach → Pay.  UGC: Brief → Reach → Pay. */}
+        {!isUgc && step === 1 && <CampaignStep s={s} set={set} />}
+        {!isUgc && step === 2 && <AudienceStep s={s} set={set} />}
+        {isUgc && step === 1 && <UgcBriefStep s={s} set={set} />}
+        {step === reachStepNo && campaignId && (
+          <ReachStep campaignId={campaignId} reach={s.targetReach} setReach={(v) => set({ targetReach: v })} pricing={pricing} />
+        )}
+        {step === payStepNo && <PayStep quote={quote} isUgc={isUgc} />}
 
         {error && (
           <div className="mt-5 rounded-xl border border-brand/20 bg-brand/5 px-4 py-3 text-[13px] text-brand-700">{error}</div>
@@ -303,10 +355,11 @@ function NewCampaignInner() {
           <Button variant="secondary" onClick={() => (step === 1 ? setService(null) : setStep((n) => n - 1))} disabled={busy}>
             <IconArrowLeft className="h-4 w-4" /> Back
           </Button>
-          {step === 1 && <Button onClick={saveCampaign} loading={busy}>Continue <IconArrowRight className="h-4 w-4" /></Button>}
-          {step === 2 && <Button onClick={saveTargeting} loading={busy}>Continue <IconArrowRight className="h-4 w-4" /></Button>}
-          {step === 3 && <Button onClick={lockQuote} loading={busy}>See price &amp; continue <IconArrowRight className="h-4 w-4" /></Button>}
-          {step === 4 && <Button onClick={pay} loading={busy} disabled={!quote}>Pay with Paystack</Button>}
+          {!isUgc && step === 1 && <Button onClick={saveCampaign} loading={busy}>Continue <IconArrowRight className="h-4 w-4" /></Button>}
+          {!isUgc && step === 2 && <Button onClick={saveTargeting} loading={busy}>Continue <IconArrowRight className="h-4 w-4" /></Button>}
+          {isUgc && step === 1 && <Button onClick={saveUgcCampaign} loading={busy}>Continue <IconArrowRight className="h-4 w-4" /></Button>}
+          {step === reachStepNo && <Button onClick={lockQuote} loading={busy}>See price &amp; continue <IconArrowRight className="h-4 w-4" /></Button>}
+          {step === payStepNo && <Button onClick={pay} loading={busy} disabled={!quote}>Pay with Paystack</Button>}
         </div>
       </div>
     </div>
@@ -451,6 +504,43 @@ function CampaignStep({ s, set }: { s: State; set: (p: Partial<State>) => void }
   );
 }
 
+function UgcBriefStep({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
+  return (
+    <div className="space-y-6">
+      <Header title="Your UGC brief" subtitle="Tell creators what to make. The clearer the brief, the better the content you’ll get to approve." />
+
+      <Field label="Campaign name">
+        <Input value={s.name} onChange={(e) => set({ name: e.target.value })} placeholder="Skinsmith serum — creator reels" />
+      </Field>
+
+      <Field label="The product / offer" hint="What are creators promoting? The key things they should know.">
+        <Textarea value={s.ugcProduct} onChange={(e) => set({ ugcProduct: e.target.value })} placeholder="A vitamin-C serum for oily skin. Key benefit: visibly clearer skin in 2 weeks…" />
+      </Field>
+
+      <Field label="Content specs" hint="Format, length, how many pieces, platforms — what you want delivered.">
+        <Textarea value={s.ugcContentSpecs} onChange={(e) => set({ ugcContentSpecs: e.target.value })} placeholder="1 vertical reel, 15–30s, for Instagram & TikTok. Show the product in use…" />
+      </Field>
+
+      <Field label="Creative guidelines" hint="Tone, dos and don’ts, references, things to avoid.">
+        <Textarea value={s.ugcGuidelines} onChange={(e) => set({ ugcGuidelines: e.target.value })} placeholder="Warm, honest, no heavy filters. Say ‘dermatologist-tested’. Don’t make medical claims…" />
+      </Field>
+
+      <Field label="Rights, delivery & budget notes" hint="How you’ll use the content, any deadlines, anything else.">
+        <Textarea value={s.ugcRights} onChange={(e) => set({ ugcRights: e.target.value })} placeholder="We’d like to reuse the content in ads for 6 months. Needed before our launch on the 20th…" />
+      </Field>
+
+      <Field label="Deadline (optional)" hint="The date you want this done by.">
+        <Input type="date" value={s.endsAt} min={new Date().toISOString().slice(0, 10)} onChange={(e) => set({ endsAt: e.target.value })} />
+      </Field>
+
+      <label className="flex cursor-pointer items-center gap-3 rounded-xl border border-rule bg-paper px-4 py-3">
+        <input type="checkbox" checked={s.ugcWantsCopy} onChange={(e) => set({ ugcWantsCopy: e.target.checked })} className="h-4 w-4 accent-brand" />
+        <span className="text-[14px] text-ink">Also send me the raw content <span className="text-muted">(it’s posted either way)</span></span>
+      </label>
+    </div>
+  );
+}
+
 function AudienceStep({ s, set }: { s: State; set: (p: Partial<State>) => void }) {
   const toggle = (key: 'locations' | 'ageBuckets' | 'religions', v: string) =>
     set({ [key]: s[key].includes(v) ? s[key].filter((x) => x !== v) : [...s[key], v] } as Partial<State>);
@@ -464,7 +554,7 @@ function AudienceStep({ s, set }: { s: State; set: (p: Partial<State>) => void }
   );
 }
 
-function ReachStep({ campaignId, reach, setReach }: { campaignId: string; reach: string; setReach: (v: string) => void }) {
+function ReachStep({ campaignId, reach, setReach, pricing }: { campaignId: string; reach: string; setReach: (v: string) => void; pricing: { label: string; presets: number[] } }) {
   const [plan, setPlan] = useState<CampaignPlan | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -493,7 +583,7 @@ function ReachStep({ campaignId, reach, setReach }: { campaignId: string; reach:
 
   return (
     <div className="space-y-6">
-      <Header title="How many people?" subtitle="Tell us the reach you want. The price is simple and flat — ₦15,000 for every 1,000 people reached." />
+      <Header title="How many people?" subtitle={`Tell us the reach you want. The price is simple and flat — ${pricing.label}.`} />
 
       <Field label="People to reach">
         <Input
@@ -507,7 +597,7 @@ function ReachStep({ campaignId, reach, setReach }: { campaignId: string; reach:
       </Field>
 
       <div className="flex flex-wrap gap-2">
-        {REACH_PRESETS.map((n) => (
+        {pricing.presets.map((n) => (
           <button
             key={n}
             onClick={() => setReach(String(n))}
@@ -542,7 +632,7 @@ function ReachStep({ campaignId, reach, setReach }: { campaignId: string; reach:
   );
 }
 
-function PayStep({ quote }: { quote: Quote | null }) {
+function PayStep({ quote, isUgc }: { quote: Quote | null; isUgc: boolean }) {
   if (!quote) return <p className="text-[14px] text-muted">No quote yet — go back and set your reach.</p>;
   return (
     <div className="space-y-6">
@@ -553,6 +643,7 @@ function PayStep({ quote }: { quote: Quote | null }) {
       </div>
       <p className="text-[13px] text-muted">
         You’ll be charged {quote.price.amount_display} via Paystack. Once it clears, we review your campaign and it goes live — you’ll get an email the moment it does.
+        {isUgc && ' Creators will then make content and send it to you to approve before anything is posted.'}
       </p>
     </div>
   );
@@ -560,10 +651,10 @@ function PayStep({ quote }: { quote: Quote | null }) {
 
 // ── Small UI helpers ───────────────────────────────────────
 
-function PromoteStepper({ current }: { current: number }) {
+function Stepper({ steps, current }: { steps: string[]; current: number }) {
   return (
     <div className="flex items-center">
-      {PROMOTE_STEPS.map((label, i) => {
+      {steps.map((label, i) => {
         const n = i + 1;
         const on = n <= current;
         return (
@@ -574,7 +665,7 @@ function PromoteStepper({ current }: { current: number }) {
               </span>
               <span className={`hidden text-[14px] font-semibold sm:inline ${on ? 'text-ink' : 'text-muted'}`}>{label}</span>
             </div>
-            {n < PROMOTE_STEPS.length && <div className={`mx-3 h-px flex-1 border-t-2 border-dashed ${n < current ? 'border-brand/50' : 'border-rule'}`} />}
+            {n < steps.length && <div className={`mx-3 h-px flex-1 border-t-2 border-dashed ${n < current ? 'border-brand/50' : 'border-rule'}`} />}
           </div>
         );
       })}

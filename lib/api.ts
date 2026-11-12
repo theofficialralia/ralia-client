@@ -173,6 +173,23 @@ export type Campaign = {
   targeting?: CampaignTargetingView | null;
 };
 
+export type UgcContentStatus = 'PENDING_CLIENT_REVIEW' | 'CLIENT_APPROVED' | 'CLIENT_REJECTED';
+
+export type UgcContent = {
+  id: string;
+  assignment_id: string;
+  campaign_id: string;
+  campaign_name: string | null;
+  promoter_name: string | null;
+  status: UgcContentStatus;
+  public_url: string | null;
+  note: string | null;
+  file_id: string | null;
+  reject_reason: string | null;
+  created_at: string;
+  reviewed_at: string | null;
+};
+
 export type Quote = {
   price: Money;
   unit_price: Money;

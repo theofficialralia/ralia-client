@@ -11,6 +11,7 @@ import { SUPPORT } from '@/lib/support';
 const nav = [
   { href: '/dashboard', label: 'Dashboard', icon: GridIcon },
   { href: '/campaigns', label: 'My Campaigns', icon: MegaphoneIcon },
+  { href: '/ugc', label: 'UGC Reviews', icon: VideoIcon },
 ];
 
 /**
@@ -213,6 +214,13 @@ function MegaphoneIcon() {
   return (
     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
       <path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1ZM14 8a4 4 0 0 1 0 8" />
+    </svg>
+  );
+}
+function VideoIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9">
+      <rect x="2.5" y="6" width="13" height="12" rx="2" /><path d="m15.5 10 6-3v10l-6-3" />
     </svg>
   );
 }
