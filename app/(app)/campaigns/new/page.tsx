@@ -153,6 +153,66 @@ const UGC_STEPS = ['Product', 'Content', 'Creative', 'Rights', 'Reach & price', 
 const PROMOTE_PRICING = { label: '₦15,000 for every 1,000 people reached', min: 1000, presets: [1000, 2000, 5000, 10000, 25000] };
 const UGC_PRICING = { label: '₦100,000 for every 5,000 people reached, per creator', min: 5000, presets: [5000, 10000, 15000, 25000] };
 
+/** Map a saved campaign (targeting + UGC brief) back into wizard state for resume. */
+function hydrateFromCampaign(c: Campaign): Partial<State> {
+  const base: Partial<State> = {
+    name: c.name,
+    ugcBrand: c.name,
+    endsAt: c.ends_at ? c.ends_at.slice(0, 10) : '',
+    destinationUrl: c.destination_url ?? '',
+    targetReach: c.target_reach && c.target_reach > 0 ? String(c.target_reach) : '',
+  };
+  // Promote targeting → chips (approximate reverse of saveTargeting).
+  const t = c.targeting;
+  if (t) {
+    base.locations = LOCATIONS.filter((l) => l.states.length > 0 && l.states.every((st) => t.states.includes(st))).map((l) => l.label);
+    if (t.age_min !== null && t.age_max !== null) {
+      base.ageBuckets = AGE_BUCKETS.filter((a) => a.min >= (t.age_min as number) && a.max <= (t.age_max as number)).map((a) => a.label);
+    }
+    base.religions = t.religions ?? [];
+  }
+  // UGC brief → the 4-part form.
+  const b = c.ugc_brief;
+  if (c.service_type === 'UGC' && b) {
+    const g = (o: Record<string, unknown> | null, k: string) => (o && o[k] != null ? String(o[k]) : '');
+    const { product: p, content_specs: cs, guidelines: gl, rights: r } = b;
+    const quantity = g(cs, 'quantity');
+    const isCustomQty = quantity !== '' && !['1', '3', '5'].includes(quantity);
+    Object.assign(base, {
+      ugcBrand: g(p, 'brand') || c.name,
+      ugcProductLink: g(p, 'product_link'),
+      ugcHasBrief: g(p, 'has_brief') || 'No',
+      ugcGoal: g(p, 'goal'),
+      ugcAudience: g(p, 'audience'),
+      ugcMarketLocation: g(p, 'market_location'),
+      ugcContentType: g(cs, 'content_type') || 'Video',
+      ugcQuantity: isCustomQty ? 'Custom quantity' : quantity,
+      ugcCustomQuantity: isCustomQty ? quantity : '',
+      ugcVideoFormat: g(cs, 'video_format') || '9:16 vertical',
+      ugcDuration: g(cs, 'duration') || '15–30 seconds',
+      ugcImageSpecs: g(cs, 'image_specs'),
+      ugcPlatformUse: g(cs, 'platform_use'),
+      ugcCaptions: g(cs, 'captions') || 'Yes, include captions',
+      ugcCreatorPost: g(cs, 'creator_post') || 'No, content only',
+      ugcKeyMessage: g(gl, 'key_message'),
+      ugcHook: g(gl, 'hook'),
+      ugcCta: g(gl, 'cta') || 'Recommend a CTA',
+      ugcRestrictions: g(gl, 'restrictions'),
+      ugcReferences: g(gl, 'references'),
+      ugcAssets: g(gl, 'assets'),
+      ugcUsageRights: g(r, 'usage_rights'),
+      ugcProductDelivery: g(r, 'product_delivery'),
+      ugcCreatorLocation: g(r, 'creator_location'),
+      ugcRawFootage: g(r, 'raw_footage') || 'No, final edited content only',
+      ugcApproval: g(r, 'approval') || 'Yes, draft approval required',
+      ugcRevisions: g(r, 'revisions') || '2 consolidated rounds',
+      ugcBudget: g(r, 'budget'),
+      ugcExtra: g(r, 'extra'),
+    });
+  }
+  return base;
+}
+
 function NewCampaignInner() {
   const router = useRouter();
   const { user } = useAuth();
@@ -183,15 +243,8 @@ function NewCampaignInner() {
         const isUgc = c.service_type === 'UGC';
         setService(isUgc ? 'UGC' : 'PROMOTE');
         setCampaignId(c.id);
-        setS((prev) => ({
-          ...prev,
-          name: c.name,
-          ugcBrand: c.name,
-          endsAt: c.ends_at ? c.ends_at.slice(0, 10) : '',
-          destinationUrl: c.destination_url ?? '',
-          // Pre-fill the reach they already chose (if quoted).
-          targetReach: c.target_reach && c.target_reach > 0 ? String(c.target_reach) : '',
-        }));
+        // Repopulate every saved field so going Back shows what was already filled.
+        setS((prev) => ({ ...prev, ...hydrateFromCampaign(c) }));
         // Jump to the reach & price step for the detected service (5 for UGC, 3 for Promote).
         setStep(isUgc ? 5 : 3);
       } catch {

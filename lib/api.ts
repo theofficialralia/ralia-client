@@ -139,7 +139,7 @@ export type CampaignStatus =
 
 export type CampaignTargetingView = {
   states: string[]; lgas: string[]; age_min: number | null; age_max: number | null;
-  genders: string[]; languages: string[]; categories: string[]; platforms: string[];
+  genders: string[]; religions: string[]; languages: string[]; categories: string[]; platforms: string[];
   min_effective_reach: number; roles: string[];
 };
 
@@ -177,6 +177,13 @@ export type Campaign = {
   created_at?: string;
   updated_at?: string;
   targeting?: CampaignTargetingView | null;
+  ugc_brief?: {
+    product: Record<string, unknown> | null;
+    content_specs: Record<string, unknown> | null;
+    guidelines: Record<string, unknown> | null;
+    rights: Record<string, unknown> | null;
+    client_wants_copy: boolean;
+  } | null;
 };
 
 export type EnterpriseTier = { months: number; price: Money };
