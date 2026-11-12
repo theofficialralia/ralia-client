@@ -147,8 +147,11 @@ const initial: State = {
 
 const PROMOTE_STEPS = ['Campaign', 'Audience', 'Reach & price', 'Pay'];
 const UGC_STEPS = ['Product', 'Content', 'Creative', 'Rights', 'Reach & price', 'Pay'];
-const PROMOTE_PRICING = { label: '₦15,000 for every 1,000 people reached', presets: [1000, 2000, 5000, 10000, 25000] };
-const UGC_PRICING = { label: '₦100,000 for every 5,000 people reached, per creator', presets: [5000, 10000, 15000, 25000] };
+// `min` is the service's smallest billable reach (one unit). Presets below it are
+// never shown, and typed values are rounded up to it, so the client never sees a
+// reach silently jump up to the minimum in the quote.
+const PROMOTE_PRICING = { label: '₦15,000 for every 1,000 people reached', min: 1000, presets: [1000, 2000, 5000, 10000, 25000] };
+const UGC_PRICING = { label: '₦100,000 for every 5,000 people reached, per creator', min: 5000, presets: [5000, 10000, 15000, 25000] };
 
 function NewCampaignInner() {
   const router = useRouter();
@@ -167,7 +170,9 @@ function NewCampaignInner() {
 
   const set = (patch: Partial<State>) => setS((prev) => ({ ...prev, ...patch }));
 
-  // Resume a draft/quoted Promote campaign: load it, jump to the reach & price step.
+  // Resume a draft/quoted campaign: load it, detect the service, and jump to that
+  // service's reach & price step so the client can finish and pay. (UGC briefs and
+  // targeting are already saved on the backend by the time a campaign exists.)
   useEffect(() => {
     if (!resumeId) return;
     let cancelled = false;
@@ -175,15 +180,20 @@ function NewCampaignInner() {
       try {
         const c = await api.get<Campaign>(`/v1/campaigns/${resumeId}`);
         if (cancelled) return;
-        setService('PROMOTE');
+        const isUgc = c.service_type === 'UGC';
+        setService(isUgc ? 'UGC' : 'PROMOTE');
         setCampaignId(c.id);
         setS((prev) => ({
           ...prev,
           name: c.name,
+          ugcBrand: c.name,
           endsAt: c.ends_at ? c.ends_at.slice(0, 10) : '',
           destinationUrl: c.destination_url ?? '',
+          // Pre-fill the reach they already chose (if quoted).
+          targetReach: c.target_reach && c.target_reach > 0 ? String(c.target_reach) : '',
         }));
-        setStep(3);
+        // Jump to the reach & price step for the detected service (5 for UGC, 3 for Promote).
+        setStep(isUgc ? 5 : 3);
       } catch {
         // fall back to a fresh wizard
       } finally {
@@ -984,7 +994,8 @@ function AudienceStep({ s, set }: { s: State; set: (p: Partial<State>) => void }
   );
 }
 
-function ReachStep({ campaignId, reach, setReach, pricing }: { campaignId: string; reach: string; setReach: (v: string) => void; pricing: { label: string; presets: number[] } }) {
+function ReachStep({ campaignId, reach, setReach, pricing }: { campaignId: string; reach: string; setReach: (v: string) => void; pricing: { label: string; min: number; presets: number[] } }) {
+  const presets = pricing.presets.filter((n) => n >= pricing.min);
   const [plan, setPlan] = useState<CampaignPlan | null>(null);
   const [previewing, setPreviewing] = useState(false);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1015,19 +1026,20 @@ function ReachStep({ campaignId, reach, setReach, pricing }: { campaignId: strin
     <div className="space-y-6">
       <Header title="How many people?" subtitle={`Tell us the reach you want. The price is simple and flat — ${pricing.label}.`} />
 
-      <Field label="People to reach">
+      <Field label="People to reach" hint={`Minimum ${pricing.min.toLocaleString('en-NG')}. Reach is sold in units, so smaller numbers round up to the next unit.`}>
         <Input
           type="number"
-          min={1}
+          min={pricing.min}
           inputMode="numeric"
           value={reach}
           onChange={(e) => setReach(e.target.value.replace(/[^0-9]/g, ''))}
-          placeholder="e.g. 5000"
+          onBlur={() => { const n = parseInt(reach, 10); if (n && n < pricing.min) setReach(String(pricing.min)); }}
+          placeholder={`e.g. ${pricing.min.toLocaleString('en-NG')}`}
         />
       </Field>
 
       <div className="flex flex-wrap gap-2">
-        {pricing.presets.map((n) => (
+        {presets.map((n) => (
           <button
             key={n}
             onClick={() => setReach(String(n))}

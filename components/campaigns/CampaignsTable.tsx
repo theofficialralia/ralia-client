@@ -5,8 +5,23 @@ import { useRouter } from 'next/navigation';
 import { useMutation } from '@tanstack/react-query';
 import { StatusPill } from '@/components/ui/StatusPill';
 import { IconRefresh } from '@/components/brand/icons';
-import { objectiveLabel } from '@/lib/campaign-options';
-import { api, type Campaign, type DashboardRow } from '@/lib/api';
+import { api, type Campaign, type CampaignServiceType, type DashboardRow } from '@/lib/api';
+
+const SERVICE_LABEL: Record<CampaignServiceType, string> = {
+  PROMOTE_EXISTING: 'Promote',
+  UGC: 'UGC',
+  ENTERPRISE: 'Enterprise',
+};
+const SERVICE_STYLE: Record<CampaignServiceType, string> = {
+  PROMOTE_EXISTING: 'bg-wash text-ink',
+  UGC: 'bg-brand/10 text-brand-700',
+  ENTERPRISE: 'bg-amber-50 text-amber-700',
+};
+
+function fmtDate(iso: string | undefined): string {
+  if (!iso) return '—';
+  return new Date(iso).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: '2-digit' });
+}
 
 /**
  * The shared "Everything you're running" table used by the dashboard and the
@@ -41,30 +56,38 @@ export function CampaignsTable({ rows, empty }: { rows: DashboardRow[]; empty?: 
           <thead>
             <tr className="border-b border-rule text-left text-[12px] uppercase tracking-wide text-muted">
               <th className="px-6 py-3.5 font-semibold">Campaign</th>
+              <th className="px-4 py-3.5 font-semibold">Type</th>
               <th className="px-4 py-3.5 font-semibold">Status</th>
               <th className="px-4 py-3.5 font-semibold">Spent</th>
-              <th className="px-4 py-3.5 font-semibold">Views</th>
-              <th className="px-4 py-3.5 font-semibold">Completed</th>
+              <th className="px-4 py-3.5 font-semibold">Created</th>
+              <th className="px-4 py-3.5 font-semibold">Modified</th>
               <th className="px-4 py-3.5" />
             </tr>
           </thead>
           <tbody>
             {rows.map((c) => {
               const draft = c.status === 'DRAFT' || c.status === 'QUOTED';
+              // Incomplete campaigns resume into the wizard (which detects UGC vs
+              // Promote from service_type); the rest open their delivery view.
               const href = draft ? `/campaigns/new?id=${c.id}` : `/campaigns/${c.id}`;
               return (
                 <tr key={c.id} className="border-b border-rule/70 last:border-0 hover:bg-wash/60">
                   <td className="px-6 py-4">
                     <div className="font-semibold text-ink">{c.name}</div>
-                    <div className="text-[12.5px] text-muted">{objectiveLabel(c.objective)} · {c.slots_total} slots</div>
+                    <div className="text-[12.5px] text-muted">{c.completed}/{c.slots_total} completed · {c.views.toLocaleString('en-NG')} views</div>
+                  </td>
+                  <td className="px-4 py-4">
+                    <span className={`inline-flex rounded-full px-2.5 py-1 text-[12px] font-semibold ${SERVICE_STYLE[c.service_type]}`}>
+                      {SERVICE_LABEL[c.service_type]}
+                    </span>
                   </td>
                   <td className="px-4 py-4"><StatusPill status={c.status} /></td>
                   <td className="px-4 py-4">
                     <div className="font-semibold text-ink">{c.spent.amount_display}</div>
                     <div className="text-[12.5px] text-muted">of {c.budget.amount_display}</div>
                   </td>
-                  <td className="px-4 py-4 tabular-nums">{c.views.toLocaleString('en-NG')}</td>
-                  <td className="px-4 py-4 tabular-nums">{c.completed}/{c.slots_total}</td>
+                  <td className="px-4 py-4 text-[13px] text-muted">{fmtDate(c.created_at)}</td>
+                  <td className="px-4 py-4 text-[13px] text-muted">{fmtDate(c.updated_at)}</td>
                   <td className="px-4 py-4 text-right">
                     <div className="inline-flex items-center gap-4">
                       {!draft && (
@@ -79,7 +102,7 @@ export function CampaignsTable({ rows, empty }: { rows: DashboardRow[]; empty?: 
                         </button>
                       )}
                       <Link href={href} className="inline-flex items-center gap-1 font-semibold text-brand-700">
-                        {draft ? 'Resume' : 'Open'}
+                        {draft ? 'Continue' : 'Open'}
                         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
                           <path d="M7 17 17 7M8 7h9v9" />
                         </svg>

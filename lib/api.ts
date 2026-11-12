@@ -148,10 +148,13 @@ export type RoleConfig = {
   budget_bucket?: string; following_size?: string; audience_reach?: string;
 };
 
+export type CampaignServiceType = 'PROMOTE_EXISTING' | 'UGC' | 'ENTERPRISE';
+
 export type Campaign = {
   id: string;
   name: string;
   objective: string;
+  service_type: CampaignServiceType;
   status: CampaignStatus;
   description: string | null;
   promoter_instructions: string | null;
@@ -170,6 +173,9 @@ export type Campaign = {
   role_config?: RoleConfig | null;
   needs_creative?: boolean;
   design_brief?: string | null;
+  target_reach?: number;
+  created_at?: string;
+  updated_at?: string;
   targeting?: CampaignTargetingView | null;
 };
 
@@ -227,12 +233,15 @@ export type DashboardRow = {
   id: string;
   name: string;
   objective: string;
+  service_type: CampaignServiceType;
   status: CampaignStatus;
   slots_total: number;
   spent: Money;
   budget: Money;
   views: number;
   completed: number;
+  created_at: string;
+  updated_at: string;
 };
 
 export type DashboardSummary = {
